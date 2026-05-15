@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: vrcomm-line-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    envVars:
+      # ── LINE Messaging API (required) ──────────────────────────────────────
+      - key: LINE_CHANNEL_SECRET
+        sync: false
+      - key: LINE_CHANNEL_ACCESS_TOKEN
+        sync: false
+
+      # ── Anthropic Claude (required) ────────────────────────────────────────
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+      # ── Google Sheets logging (optional but recommended) ───────────────────
+      - key: GOOGLE_CREDENTIALS_JSON
+        sync: false          # paste the full service account JSON string
+      - key: GOOGLE_SHEET_ID
+        sync: false          # ID from the spreadsheet URL
+
+      # ── /export endpoint protection (optional) ────────────────────────────
+      - key: EXPORT_PASSWORD
+        sync: false
+
+      # ── Internal paths ────────────────────────────────────────────────────
+      - key: DB_PATH
+        value: /tmp/vrcomm_line_messages.db
+      - key: EXPORT_PATH
+        value: /tmp/line_messages_export.xlsx
+      - key: PYTHON_VERSION
+        value: "3.11.0"
