@@ -14,10 +14,18 @@ HISTORY_HEADERS = [
     "user_id", "display_name", "role", "content", "logged_at"
 ]
 
-_spreadsheet  = None   # shared gspread Spreadsheet object
-_worksheet    = None   # "LINE Messages" sheet
-_hist_sheet   = None   # "Chat History" sheet
-_row_counter  = 1
+EMAIL_HEADERS = [
+    "No.", "Received At", "Logged At (Server)", "Task ID",
+    "Sender Name", "Sender Email", "Subject", "Category",
+    "Body Preview", "Summary", "Draft Reply", "Status",
+]
+
+_spreadsheet   = None   # shared gspread Spreadsheet object
+_worksheet     = None   # "LINE Messages" sheet
+_hist_sheet    = None   # "Chat History" sheet
+_email_sheet   = None   # "Email Messages" sheet
+_row_counter   = 1
+_email_counter = 1
 
 
 def _get_spreadsheet():
@@ -76,6 +84,30 @@ def _init_messages_sheet():
         return None
 
 
+def _init_email_sheet():
+    """Return the Email Messages worksheet, creating it if needed."""
+    global _email_sheet, _email_counter
+    if _email_sheet is not None:
+        return _email_sheet
+    sp = _get_spreadsheet()
+    if sp is None:
+        return None
+    try:
+        import gspread
+        try:
+            _email_sheet = sp.worksheet("Email Messages")
+        except gspread.WorksheetNotFound:
+            _email_sheet = sp.add_worksheet(title="Email Messages", rows=5000, cols=len(EMAIL_HEADERS))
+            _email_sheet.append_row(EMAIL_HEADERS, value_input_option="RAW")
+        existing = _email_sheet.get_all_values()
+        _email_counter = max(1, len(existing))
+        logger.info("Email Messages sheet ready -- next row: %d", _email_counter + 1)
+        return _email_sheet
+    except Exception as e:
+        logger.error("Email Messages sheet init failed: %s", e)
+        return None
+
+
 def _init_history_sheet():
     """Return the Chat History worksheet, creating it if needed."""
     global _hist_sheet
@@ -121,6 +153,57 @@ def log_to_sheet(user_id, display_name, source_type, source_id,
         logger.info("Sheets: logged message row %d for %s", _row_counter - 1, display_name)
     except Exception as e:
         logger.error("Sheets message log failed: %s", e)
+
+
+# ── Email logging ─────────────────────────────────────────────────────────────
+
+def log_email(task_id: str, sender_name: str, sender_email: str,
+              subject: str, category: str, body_preview: str,
+              summary: str, draft_reply: str,
+              received_at: str = "", status: str = "pending"):
+    """Log an incoming email to the Email Messages sheet."""
+    global _email_counter
+    ws = _init_email_sheet()
+    if ws is None:
+        return
+    try:
+        row = [
+            _email_counter,
+            received_at or datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+            datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+            task_id,
+            sender_name, sender_email, subject, category,
+            body_preview[:300],
+            summary,
+            draft_reply,
+            status,
+        ]
+        ws.append_row(row, value_input_option="USER_ENTERED")
+        _email_counter += 1
+        logger.info("Sheets: logged email row %d task=%s", _email_counter - 1, task_id)
+    except Exception as e:
+        logger.error("Sheets email log failed: %s", e)
+
+
+def update_email_status(task_id: str, new_status: str):
+    """Update the Status column for a given Task ID in Email Messages sheet."""
+    ws = _init_email_sheet()
+    if ws is None:
+        return
+    try:
+        all_rows = ws.get_all_values()
+        # Column D (index 3) = Task ID; Column L (index 11) = Status
+        for i, row in enumerate(all_rows):
+            if i == 0:
+                continue  # skip header
+            if len(row) >= 4 and row[3] == task_id:
+                sheet_row = i + 1           # 1-based
+                ws.update_cell(sheet_row, 12, new_status)
+                logger.info("Sheets: updated email status task=%s -> %s", task_id, new_status)
+                return
+        logger.warning("Sheets: task_id %s not found in Email Messages", task_id)
+    except Exception as e:
+        logger.error("Sheets email status update failed: %s", e)
 
 
 # ── Conversation history (persistent memory) ──────────────────────────────────

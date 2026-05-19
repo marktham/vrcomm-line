@@ -46,8 +46,99 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_conv_user
             ON conversation_history (user_id, id)
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS pending_approvals (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id       TEXT UNIQUE NOT NULL,
+                sender_name   TEXT,
+                sender_email  TEXT,
+                subject       TEXT,
+                body_preview  TEXT,
+                full_body     TEXT,
+                message_id    TEXT,
+                category      TEXT,
+                summary       TEXT,
+                draft_reply   TEXT,
+                status        TEXT DEFAULT 'pending',
+                created_at    TEXT DEFAULT (datetime('now')),
+                resolved_at   TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS graph_subscriptions (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                subscription_id TEXT UNIQUE,
+                expiry          TEXT,
+                updated_at      TEXT DEFAULT (datetime('now'))
+            )
+        """)
         conn.commit()
     logger.info("Database initialised at: %s", DB_PATH)
+
+
+# ── Pending approvals ─────────────────────────────────────────────────────────
+
+def save_pending(task_id, sender_name, sender_email, subject,
+                 body_preview, full_body, message_id, category, summary, draft_reply):
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT OR REPLACE INTO pending_approvals
+            (task_id, sender_name, sender_email, subject, body_preview,
+             full_body, message_id, category, summary, draft_reply)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (task_id, sender_name, sender_email, subject, body_preview,
+              full_body, message_id, category, summary, draft_reply))
+        conn.commit()
+    logger.info("Pending approval saved: %s", task_id)
+
+
+def get_pending(task_id: str) -> dict:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM pending_approvals WHERE task_id = ? AND status = 'pending'",
+            (task_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def resolve_pending(task_id: str, status: str):
+    """Mark a task as sent/edited/cancelled."""
+    with get_conn() as conn:
+        conn.execute(
+            """UPDATE pending_approvals SET status = ?, resolved_at = datetime('now')
+               WHERE task_id = ?""",
+            (status, task_id)
+        )
+        conn.commit()
+    logger.info("Task %s resolved as: %s", task_id, status)
+
+
+def get_all_pending() -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM pending_approvals WHERE status = 'pending' ORDER BY created_at DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# ── Graph subscription tracking ───────────────────────────────────────────────
+
+def save_subscription(subscription_id: str, expiry: str):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM graph_subscriptions")
+        conn.execute(
+            "INSERT INTO graph_subscriptions (subscription_id, expiry) VALUES (?, ?)",
+            (subscription_id, expiry)
+        )
+        conn.commit()
+
+
+def get_subscription() -> dict:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM graph_subscriptions ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    return dict(row) if row else None
 
 
 # ── Conversation history ──────────────────────────────────────────────────────
