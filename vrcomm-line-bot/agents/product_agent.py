@@ -183,44 +183,68 @@ def _fetch_url(url: str) -> str:
         return ""
 
 
-# ── STEP 2: Answer prompt (ONLY selected brands in context) ──────────────────
+# ── Forbidden brands (post-processing safety net) ────────────────────────────
 
-_ANSWER_SYSTEM_WITH_MATCH = """You are VRCOMM's Product Specialist.
-VRCOMM is a Network and Cybersecurity solutions provider in Thailand.
+_FORBIDDEN_BRANDS = [
+    "fortinet", "fortigate", "cisco", "palo alto", "check point", "checkpoint",
+    "juniper", "sonicwall", "sonic wall", "barracuda", "trend micro", "trendmicro",
+    "crowdstrike", "crowd strike", "sentinelone", "sentinel one", "mcafee",
+    "symantec", "broadcom", "hp ", "hewlett", "dell ", "aruba", "meraki",
+    "watchguard", "watch guard", "zyxel", "netgear", "ubiquiti",
+]
 
-The customer asked about products. Based on our catalog, the relevant VRCOMM products are:
+
+def _contains_forbidden_brand(text: str) -> str:
+    """Return the first forbidden brand found in text, or empty string."""
+    text_lower = text.lower()
+    for brand in _FORBIDDEN_BRANDS:
+        if brand in text_lower:
+            return brand
+    return ""
+
+
+# ── STEP 2: Answer prompt (internal staff tone) ───────────────────────────────
+
+_ANSWER_SYSTEM_WITH_MATCH = """You are a VRCOMM pre-sales engineer briefing an internal staff member.
+This is an INTERNAL conversation — not customer-facing.
+
+The relevant VRCOMM products for this query are listed below.
+These are the ONLY products you may discuss. Period.
 
 {selected_brands_section}
 
-Answer the customer's question using ONLY the products listed above.
-Do NOT mention any other brands under any circumstances.
-If the customer asks about a brand not listed above, say VRCOMM does not carry it.
+HARD RULES:
+- You may ONLY mention the brands listed above in your answer
+- FORBIDDEN brands (never mention these under any circumstances):
+  Fortinet, FortiGate, Cisco, Palo Alto, Check Point, Juniper, SonicWall,
+  Barracuda, Trend Micro, CrowdStrike, SentinelOne, or ANY brand not listed above
+- If you are tempted to suggest a product not in the list above — don't. Pick the closest match from the list instead.
+- NEVER quote specific prices — say: "ให้ Sales ดึง cost sheet แล้วทำ quote ได้เลยครับ"
+- Tone: direct, technical, colleague-to-colleague — not customer service language
+- Reply in the SAME LANGUAGE as the staff member (Thai → Thai, English → English)
+- Plain text only — no markdown, no bullets, no headers
+- Max 4-5 short paragraphs"""
 
-Rules:
-- NEVER quote specific prices. If asked: "ทีม Sales จะจัดทำใบเสนอราคาให้ครับ"
-- Reply in the SAME LANGUAGE as the customer (Thai → Thai, English → English)
-- Be concise and technical — max 4-5 short paragraphs
-- Plain text only — no markdown, no bullets, no headers"""
+_ANSWER_SYSTEM_NO_MATCH = """You are a VRCOMM pre-sales engineer briefing an internal staff member.
+This is an INTERNAL conversation — not customer-facing.
 
-_ANSWER_SYSTEM_NO_MATCH = """You are VRCOMM's Product Specialist.
-VRCOMM is a Network and Cybersecurity solutions provider in Thailand.
+The staff member is asking about a product category or brand that VRCOMM does not carry.
 
-The customer is asking about a product or category. VRCOMM does NOT carry the brand(s) mentioned.
-
-VRCOMM's complete product portfolio (all brands we sell):
+VRCOMM's complete product portfolio (ALL brands we sell — nothing else):
 {full_list}
 
 Your task:
-1. Politely inform the customer that VRCOMM does not carry the requested brand
-2. Suggest the most suitable alternative(s) from the list above that serve the same purpose
+1. Confirm that VRCOMM does not carry the requested brand/product
+2. Recommend the best alternative(s) from the list above for the same use case
 3. If relevant, propose a combined solution using multiple brands from the list
 
-Rules:
-- ONLY recommend brands from the list above — never suggest anything outside it
-- NEVER quote specific prices. If asked: "ทีม Sales จะจัดทำใบเสนอราคาให้ครับ"
-- Reply in the SAME LANGUAGE as the customer (Thai → Thai, English → English)
-- Be concise — max 4-5 short paragraphs
-- Plain text only — no markdown, no bullets, no headers"""
+HARD RULES:
+- Recommend ONLY brands from the list above — nothing outside it
+- FORBIDDEN: Fortinet, Cisco, Palo Alto, Check Point, or any brand NOT in the list
+- NEVER quote prices — say: "ให้ Sales ดึง cost sheet แล้วทำ quote ได้เลยครับ"
+- Tone: direct, technical, internal briefing — not customer service
+- Reply in the SAME LANGUAGE as the staff member
+- Plain text only — max 4-5 short paragraphs"""
 
 
 def _build_answer_system(selected: list, product_list: list) -> str:
@@ -272,12 +296,10 @@ def handle(message: str, user_name: str, user_id: str,
     # STEP 2 — answer using only selected brands (or suggest alternatives)
     system = _build_answer_system(selected, product_list)
 
-    content = message if history else (
-        "Customer: %s%s\n\n%s" % (
-            user_name,
-            " (via email)" if source == "email" else "",
-            message
-        )
+    # Internal framing — staff, not customer
+    src_note = " (via email)" if source == "email" else ""
+    content  = message if history else (
+        "Staff: %s%s\n\nQuery: %s" % (user_name, src_note, message)
     )
     messages = history + [{"role": "user", "content": content}]
 
@@ -289,6 +311,24 @@ def handle(message: str, user_name: str, user_id: str,
             messages=messages,
         )
         reply = response.content[0].text.strip()
+
+        # Post-processing safety net — retry once if forbidden brand detected
+        forbidden = _contains_forbidden_brand(reply)
+        if forbidden:
+            logger.warning("[product_agent] Forbidden brand '%s' in reply — retrying", forbidden)
+            retry_system = system + (
+                "\n\nCRITICAL: Your previous answer mentioned '%s' which is NOT in VRCOMM's product list. "
+                "Rewrite the answer using ONLY the VRCOMM brands provided above." % forbidden
+            )
+            retry_resp = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=768,
+                system=retry_system,
+                messages=messages,
+            )
+            reply = retry_resp.content[0].text.strip()
+            logger.info("[product_agent] Retry reply: %s", reply[:80])
+
         logger.info("[product_agent] replied to %s (selected=%s): %s",
                     user_name, [s["brand"] for s in selected], reply[:80])
         return reply
