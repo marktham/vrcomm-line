@@ -7,13 +7,19 @@ Handles:
   3. spec_comparison  — Compare products against each other or a requirement
 
 Data sources (priority order):
-  1. specs/ folder    — .txt/.md spec sheets per brand (add files here)
-  2. product URLs     — fetch from VRCOMM_ProductList.xlsx URLs
-  3. Claude knowledge — fallback for well-known products
+  1. specs/{Brand Name}/   — local brand folder with .txt/.md files
+  2. SharePoint            — specs/{Brand Name}/ folder on SharePoint (Graph API)
+  3. product URLs          — fetch vendor website as fallback
 
-Two-Step architecture (same as product_agent — prevents hallucination):
-  Step 1: Claude selects relevant brands from VRCOMM list
-  Step 2: Claude answers using only those brands + spec content
+Three-layer anti-hallucination (same pattern as product_agent):
+  Step 1: Haiku selects relevant brands from VRCOMM list only
+  Step 2: Sonnet answers using positive allowlist prompt (only named brands)
+  Step 3: Post-processing — forbidden-brand scan → retry → sentence strip
+
+SharePoint config (environment variables):
+  SHAREPOINT_SITE_ID     — Graph API site ID (from /sites endpoint)
+  SHAREPOINT_SPECS_PATH  — folder path inside Documents, e.g. "ProductSpecs"
+  (Uses same AZURE_CLIENT_ID / AZURE_CLIENT_SECRET / AZURE_TENANT_ID as email_handler)
 """
 import os, re, logging, time
 import requests
@@ -69,42 +75,253 @@ def _load_product_list() -> list:
         return []
 
 
-# ── Spec file loader ──────────────────────────────────────────────────────────
+# ── Local spec loader (folder-based) ─────────────────────────────────────────
 
-_spec_cache: dict = {}   # brand_lower → {"content": str, "mtime": float}
+_spec_cache: dict = {}   # brand_key → {"content": str, "mtime": float}
 
 
-def _load_spec_file(brand: str) -> str:
+def _brand_folder_match(brand: str) -> str:
     """
-    Load spec file for a brand from specs/ folder.
-    Tries: exact brand name, brand with underscores, partial match.
-    Returns content string or empty if not found.
+    Find the best-matching subfolder in specs/ for a given brand name.
+    Returns the full folder path, or empty string if not found.
+
+    Matching strategy:
+      1. Exact match (case-insensitive)
+      2. Brand name is a substring of folder name
+      3. Folder name is a substring of brand name
     """
     if not os.path.isdir(_SPECS_DIR):
         return ""
 
-    brand_key = brand.lower().replace(" ", "_").replace("-", "_")
+    brand_lower = brand.lower()
+    try:
+        for entry in os.scandir(_SPECS_DIR):
+            if not entry.is_dir():
+                continue
+            folder_lower = entry.name.lower()
+            if (folder_lower == brand_lower
+                    or brand_lower in folder_lower
+                    or folder_lower in brand_lower):
+                return entry.path
+    except Exception as e:
+        logger.warning("[engineer_agent] Folder scan error: %s", e)
+    return ""
 
-    # Try all .txt and .md files in specs/
+
+def _load_spec_local(brand: str) -> str:
+    """
+    Load all .txt and .md files from specs/{Brand Name}/ folder.
+    Falls back to legacy flat-file lookup (specs/brand_name.txt) for compatibility.
+    Content is cached by folder mtime.
+    """
+    brand_key = brand.lower()
+
+    # ── Priority 1: brand subfolder (new structure) ───────────────────────────
+    folder = _brand_folder_match(brand)
+    if folder:
+        try:
+            # Use max mtime across all files in the folder as cache key
+            files = [
+                os.path.join(folder, f)
+                for f in os.listdir(folder)
+                if f.endswith((".txt", ".md"))
+            ]
+            if files:
+                max_mtime = max(os.path.getmtime(f) for f in files)
+                cached = _spec_cache.get(brand_key)
+                if cached and cached.get("mtime") == max_mtime:
+                    return cached["content"]
+
+                parts = []
+                for fpath in sorted(files):
+                    with open(fpath, "r", encoding="utf-8", errors="ignore") as fh:
+                        parts.append(fh.read())
+                content = "\n\n".join(parts)[:5000]
+                _spec_cache[brand_key] = {"content": content, "mtime": max_mtime}
+                logger.info("[engineer_agent] Loaded spec folder: %s (%d files)",
+                            folder, len(files))
+                return content
+        except Exception as e:
+            logger.warning("[engineer_agent] Spec folder load error [%s]: %s", folder, e)
+
+    # ── Priority 2: legacy flat file (specs/brand_name.txt) ──────────────────
+    brand_slug = brand.lower().replace(" ", "_").replace("-", "_")
     try:
         for fname in os.listdir(_SPECS_DIR):
             if not fname.endswith((".txt", ".md")):
                 continue
             fname_key = fname.lower().replace("-", "_").rsplit(".", 1)[0]
-            if fname_key == brand_key or brand_key in fname_key or fname_key in brand_key:
+            if fname_key == brand_slug or brand_slug in fname_key or fname_key in brand_slug:
                 fpath = os.path.join(_SPECS_DIR, fname)
                 mtime = os.path.getmtime(fpath)
                 cached = _spec_cache.get(brand_key)
-                if cached and cached["mtime"] == mtime:
+                if cached and cached.get("mtime") == mtime:
                     return cached["content"]
-                with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
-                    content = f.read()[:4000]
+                with open(fpath, "r", encoding="utf-8", errors="ignore") as fh:
+                    content = fh.read()[:5000]
                 _spec_cache[brand_key] = {"content": content, "mtime": mtime}
-                logger.info("[engineer_agent] Loaded spec file: %s", fname)
+                logger.info("[engineer_agent] Loaded spec file (legacy): %s", fname)
                 return content
     except Exception as e:
-        logger.warning("[engineer_agent] Spec file load error: %s", e)
+        logger.warning("[engineer_agent] Legacy spec file error: %s", e)
+
     return ""
+
+
+# ── SharePoint spec loader ────────────────────────────────────────────────────
+
+_SHAREPOINT_SITE_ID   = os.environ.get("SHAREPOINT_SITE_ID", "")
+_SHAREPOINT_SPECS_PATH = os.environ.get("SHAREPOINT_SPECS_PATH", "ProductSpecs")
+_sp_token_cache: dict = {}   # {"token": str, "expires_at": float}
+_sp_spec_cache:  dict = {}   # brand_key → {"content": str, "fetched_at": float}
+_SP_CACHE_TTL = 3600         # 1 hour
+
+
+def _get_graph_token() -> str:
+    """Get Microsoft Graph API access token (cached). Same credentials as email_handler."""
+    now = time.time()
+    cached = _sp_token_cache.get("token")
+    if cached and now < _sp_token_cache.get("expires_at", 0) - 60:
+        return cached
+
+    tenant_id     = os.environ.get("AZURE_TENANT_ID", "")
+    client_id     = os.environ.get("AZURE_CLIENT_ID", "")
+    client_secret = os.environ.get("AZURE_CLIENT_SECRET", "")
+
+    if not all([tenant_id, client_id, client_secret]):
+        return ""
+
+    try:
+        resp = requests.post(
+            "https://login.microsoftonline.com/%s/oauth2/v2.0/token" % tenant_id,
+            data={
+                "grant_type":    "client_credentials",
+                "client_id":     client_id,
+                "client_secret": client_secret,
+                "scope":         "https://graph.microsoft.com/.default",
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        token = data.get("access_token", "")
+        expires_in = data.get("expires_in", 3600)
+        _sp_token_cache["token"]      = token
+        _sp_token_cache["expires_at"] = now + expires_in
+        return token
+    except Exception as e:
+        logger.warning("[engineer_agent] Graph token error: %s", e)
+        return ""
+
+
+def _load_spec_sharepoint(brand: str) -> str:
+    """
+    Load spec files from SharePoint: Documents/{SHAREPOINT_SPECS_PATH}/{Brand Name}/
+    Returns concatenated text content of all .txt and .md files in that folder.
+    Cached 1 hour.
+    """
+    if not _SHAREPOINT_SITE_ID:
+        return ""
+
+    brand_key = brand.lower()
+    now = time.time()
+    cached = _sp_spec_cache.get(brand_key)
+    if cached and (now - cached["fetched_at"]) < _SP_CACHE_TTL:
+        return cached["content"]
+
+    token = _get_graph_token()
+    if not token:
+        return ""
+
+    headers = {"Authorization": "Bearer " + token, "Accept": "application/json"}
+    base_url = "https://graph.microsoft.com/v1.0"
+
+    # Step 1: Find the brand subfolder under the specs path
+    # Search in /sites/{site_id}/drive/root:/{specs_path}/{brand}/children
+    brand_folder_path = "%s/%s" % (_SHAREPOINT_SPECS_PATH.strip("/"), brand)
+    folder_url = "%s/sites/%s/drive/root:/%s:/children" % (
+        base_url, _SHAREPOINT_SITE_ID, brand_folder_path
+    )
+
+    try:
+        resp = requests.get(folder_url, headers=headers, timeout=10)
+        if resp.status_code == 404:
+            # Try fuzzy match: list parent folder and find best match
+            parent_url = "%s/sites/%s/drive/root:/%s:/children" % (
+                base_url, _SHAREPOINT_SITE_ID, _SHAREPOINT_SPECS_PATH
+            )
+            parent_resp = requests.get(parent_url, headers=headers, timeout=10)
+            if parent_resp.status_code != 200:
+                return ""
+
+            items = parent_resp.json().get("value", [])
+            brand_lower = brand.lower()
+            match_id = None
+            for item in items:
+                if item.get("folder") is None:
+                    continue
+                name_lower = item["name"].lower()
+                if (name_lower == brand_lower
+                        or brand_lower in name_lower
+                        or name_lower in brand_lower):
+                    match_id = item["id"]
+                    break
+
+            if not match_id:
+                logger.info("[engineer_agent] SharePoint: no folder found for '%s'", brand)
+                _sp_spec_cache[brand_key] = {"content": "", "fetched_at": now}
+                return ""
+
+            children_url = "%s/sites/%s/drive/items/%s/children" % (
+                base_url, _SHAREPOINT_SITE_ID, match_id
+            )
+            resp = requests.get(children_url, headers=headers, timeout=10)
+
+        resp.raise_for_status()
+        files = resp.json().get("value", [])
+
+    except Exception as e:
+        logger.warning("[engineer_agent] SharePoint folder list error [%s]: %s", brand, e)
+        return ""
+
+    # Step 2: Download each .txt / .md file
+    parts = []
+    for item in files:
+        name = item.get("name", "")
+        if not name.lower().endswith((".txt", ".md")):
+            continue
+        download_url = item.get("@microsoft.graph.downloadUrl")
+        if not download_url:
+            continue
+        try:
+            dl = requests.get(download_url, timeout=10)
+            dl.raise_for_status()
+            parts.append(dl.text[:3000])
+            logger.info("[engineer_agent] SharePoint: downloaded %s for '%s'", name, brand)
+        except Exception as e:
+            logger.warning("[engineer_agent] SharePoint download error [%s]: %s", name, e)
+
+    content = "\n\n".join(parts)[:6000] if parts else ""
+    _sp_spec_cache[brand_key] = {"content": content, "fetched_at": now}
+
+    if content:
+        logger.info("[engineer_agent] SharePoint spec loaded for '%s' (%d chars)", brand, len(content))
+    return content
+
+
+def _load_spec_file(brand: str) -> str:
+    """
+    Load spec content for a brand. Priority:
+      1. Local specs/{Brand Name}/ folder
+      2. SharePoint specs folder (if SHAREPOINT_SITE_ID is set)
+      3. (Caller falls back to URL fetch if this returns empty)
+    """
+    content = _load_spec_local(brand)
+    if content:
+        return content
+
+    content = _load_spec_sharepoint(brand)
+    return content
 
 
 # ── URL fetcher (cached 1 hr) ─────────────────────────────────────────────────
@@ -231,68 +448,121 @@ def _select_relevant_brands(message: str, product_list: list) -> list:
         return []
 
 
-# ── STEP 2: System prompts ────────────────────────────────────────────────────
+# ── Forbidden brands (same list as product_agent) ────────────────────────────
 
-_TECH_QA_SYSTEM = """You are VRCOMM's Senior Network and Cybersecurity Engineer.
-VRCOMM is a solutions provider in Thailand.
+_FORBIDDEN_BRANDS = [
+    "fortinet", "fortigate", "cisco", "palo alto", "check point", "checkpoint",
+    "juniper", "sonicwall", "sonic wall", "barracuda", "trend micro", "trendmicro",
+    "crowdstrike", "crowd strike", "sentinelone", "sentinel one", "mcafee",
+    "symantec", "broadcom", "hp ", "hewlett", "dell ", "aruba", "meraki",
+    "watchguard", "watch guard", "zyxel", "netgear", "ubiquiti",
+]
 
-The following VRCOMM products are relevant to this query:
 
+def _contains_forbidden_brand(text: str) -> str:
+    """Return the first forbidden brand found in text, or empty string."""
+    text_lower = text.lower()
+    for brand in _FORBIDDEN_BRANDS:
+        if brand in text_lower:
+            return brand
+    return ""
+
+
+def _strip_forbidden_sentences(text: str) -> str:
+    """Nuclear option: remove any sentence containing a forbidden brand."""
+    parts = re.split(r'(?<=[.!?\n])\s+', text)
+    clean, removed = [], []
+    for part in parts:
+        if _contains_forbidden_brand(part):
+            removed.append(part[:60])
+        else:
+            clean.append(part)
+    if removed:
+        logger.warning("[engineer_agent] Stripped %d forbidden sentence(s): %s",
+                       len(removed), removed)
+    result = " ".join(clean).strip()
+    return result or "ขออภัยครับ ไม่สามารถให้ข้อมูลเพิ่มเติมได้ กรุณาติดต่อทีม Engineer โดยตรงครับ"
+
+
+# ── STEP 2: System prompts (Sonnet — positive allowlist approach) ─────────────
+
+_TECH_QA_SYSTEM = """You are VRCOMM's Senior Network and Cybersecurity Engineer briefing a colleague.
+VRCOMM is a Network and Cybersecurity solutions provider in Thailand.
+This is an INTERNAL conversation — staff to staff, NOT customer-facing.
+
+══════════════════════════════════════════════════════
+ALLOWED BRANDS — you may ONLY discuss these, nothing else:
+{allowed_brand_names}
+
+Product specs:
 {product_specs_section}
+══════════════════════════════════════════════════════
 
-Answer the technical question using ONLY the VRCOMM products listed above.
-Do NOT mention any brand not listed here (e.g. Fortinet, Cisco, Palo Alto, etc.).
+BEFORE writing anything, verify: every brand name in your reply must appear in the ALLOWED BRANDS list above.
 
-Guidelines:
-- Provide accurate technical specifications and comparisons
-- Recommend specific models/configurations when possible
-- For sizing questions: consider users, throughput, concurrent sessions
-- NEVER quote prices — say: "ทีม Sales จะจัดทำใบเสนอราคาให้ครับ"
-- Reply in the SAME LANGUAGE as the user (Thai → Thai, English → English)
+RULES:
+- Mention ONLY brands from the ALLOWED BRANDS list
+- Do NOT mention Fortinet, FortiGate, Cisco, Palo Alto, Check Point, Juniper, SonicWall or any brand not in the list — these are our competitors
+- Provide accurate technical specs and model recommendations
+- For sizing questions: address users, throughput, concurrent sessions
+- NEVER quote prices — say: "ให้ Sales ดึง cost sheet แล้วทำ quote ได้เลยครับ"
+- Tone: direct, technical, colleague-to-colleague — internal briefing, not customer service
+- Reply in the SAME LANGUAGE as the staff member (Thai → Thai, English → English)
 - Plain text only — no markdown, no bullets, no headers
 - Max 5 short paragraphs"""
 
 _TOR_ANALYSIS_SYSTEM = """You are VRCOMM's Senior Pre-Sales Engineer specialising in TOR/SOW compliance.
 VRCOMM is a Network and Cybersecurity solutions provider in Thailand.
+This is an INTERNAL analysis for a colleague preparing a proposal.
 
-The following VRCOMM products are available for this proposal:
+══════════════════════════════════════════════════════
+ALLOWED BRANDS — you may ONLY recommend these, nothing else:
+{allowed_brand_names}
 
+Product specs:
 {product_specs_section}
+══════════════════════════════════════════════════════
 
-Analyse the TOR/SOW requirements and produce a compliance table.
+Analyse the TOR/SOW and produce a compliance table. Every product you recommend MUST be from the ALLOWED BRANDS list.
 
-Format each requirement as:
-  [No.] Requirement | Recommended Product | Compliance | Notes
+Output format — one line per requirement:
+  ข้อ [No.] | ข้อกำหนด: [requirement text] | สินค้า: [Brand + model] | สถานะ: [FULL/PARTIAL/ALT] | หมายเหตุ: [brief note]
 
-Compliance status:
-  FULL    — product fully meets this requirement
-  PARTIAL — product meets with configuration or optional add-on
-  ALT     — alternative approach using VRCOMM product
+Status definitions:
+  FULL    — meets requirement fully out of the box
+  PARTIAL — meets with additional config or add-on license
+  ALT     — alternative solution using VRCOMM product covers the intent
 
-After the table, add a brief summary of the proposed solution.
+After the table: 2-3 sentences summarising the proposed solution and any gaps.
 
-Rules:
-- ONLY use products listed above — never suggest outside brands
+RULES:
+- Recommend ONLY brands from the ALLOWED BRANDS list
+- Do NOT mention Fortinet, Cisco, Palo Alto, Check Point, or any brand outside the list
 - NEVER quote prices
 - Reply in the SAME LANGUAGE as the document (Thai → Thai, English → English)
-- Plain text only — no markdown"""
+- Plain text only — no markdown formatting"""
 
-_NO_MATCH_SYSTEM = """You are VRCOMM's Senior Network and Cybersecurity Engineer.
-VRCOMM is a solutions provider in Thailand.
+_NO_MATCH_SYSTEM = """You are VRCOMM's Senior Network and Cybersecurity Engineer briefing a colleague.
+VRCOMM is a Network and Cybersecurity solutions provider in Thailand.
+This is an INTERNAL conversation — staff to staff, NOT customer-facing.
 
-VRCOMM's complete product portfolio:
+The query is about a product type where no direct brand match was found in VRCOMM's catalog.
+Recommend the best available alternatives.
+
+══════════════════════════════════════════════════════
+VRCOMM's COMPLETE product portfolio (ALL brands we sell — nothing else):
 {full_list}
+══════════════════════════════════════════════════════
 
-The customer's query does not match any specific product in our catalog,
-but you should still provide helpful technical guidance using ONLY the products above.
+BEFORE writing anything, verify: every brand name you mention must appear in the list above.
 
-Rules:
-- Suggest the most technically suitable products from the list for the requirement
-- Explain why each suggested product fits
-- NEVER mention brands outside this list
-- NEVER quote prices
-- Reply in the SAME LANGUAGE as the user
-- Plain text only — max 5 paragraphs"""
+RULES:
+- Recommend ONLY brands from the list above
+- Do NOT mention Fortinet, Cisco, Palo Alto, Check Point, or any brand not on the list
+- NEVER quote prices — say: "ให้ Sales ดึง cost sheet แล้วทำ quote ได้เลยครับ"
+- Tone: direct, technical, colleague-to-colleague
+- Reply in the SAME LANGUAGE as the staff member
+- Plain text only — max 5 short paragraphs"""
 
 
 def _build_product_specs_section(selected: list) -> str:
@@ -318,15 +588,21 @@ def _build_system(mode: str, selected: list, product_list: list) -> str:
         )
         return _NO_MATCH_SYSTEM.format(full_list=full_list)
 
+    # Positive allowlist — tell Claude exactly which brands it CAN use
+    allowed_brand_names = "\n".join(
+        "  - %s" % p["brand"] for p in selected
+    )
     product_specs_section = _build_product_specs_section(selected)
 
     if mode == "tor_analysis":
         return _TOR_ANALYSIS_SYSTEM.format(
-            product_specs_section=product_specs_section
+            allowed_brand_names=allowed_brand_names,
+            product_specs_section=product_specs_section,
         )
     else:
         return _TECH_QA_SYSTEM.format(
-            product_specs_section=product_specs_section
+            allowed_brand_names=allowed_brand_names,
+            product_specs_section=product_specs_section,
         )
 
 
@@ -370,17 +646,45 @@ def handle(message: str, user_name: str, user_id: str,
     )
     messages = history + [{"role": "user", "content": content}]
 
-    # TOR analysis may need more tokens for the compliance table
+    # TOR analysis needs more tokens for the compliance table
     max_tokens = 1500 if mode == "tor_analysis" else 768
 
     try:
+        # Step 2 uses Sonnet — better instruction-following under strict constraints
         response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model="claude-sonnet-4-6",
             max_tokens=max_tokens,
             system=system,
             messages=messages,
         )
         reply = response.content[0].text.strip()
+
+        # ── Layer 2: Retry if forbidden brand detected ────────────────────────
+        forbidden = _contains_forbidden_brand(reply)
+        if forbidden:
+            logger.warning("[engineer_agent] Forbidden brand '%s' in reply — retrying", forbidden)
+            retry_messages = messages + [
+                {"role": "assistant", "content": reply},
+                {"role": "user", "content": (
+                    "คำตอบของคุณเมนชั่น '%s' ซึ่งไม่มีในรายการสินค้า VRCOMM เลย "
+                    "กรุณาตอบใหม่โดยใช้เฉพาะสินค้าใน ALLOWED BRANDS list เท่านั้น "
+                    "ห้ามเมนชั่น %s หรือสินค้าอื่นที่ไม่อยู่ใน list" % (forbidden, forbidden)
+                )},
+            ]
+            retry_resp = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=max_tokens,
+                system=system,
+                messages=retry_messages,
+            )
+            reply = retry_resp.content[0].text.strip()
+            logger.info("[engineer_agent] Retry reply: %s", reply[:80])
+
+            # ── Layer 3: Sentence-level strip — nuclear last resort ────────
+            if _contains_forbidden_brand(reply):
+                logger.warning("[engineer_agent] Retry still has forbidden brand — stripping")
+                reply = _strip_forbidden_sentences(reply)
+
         logger.info("[engineer_agent] replied (mode=%s, brands=%s): %s",
                     mode, [s["brand"] for s in selected], reply[:80])
         return reply
