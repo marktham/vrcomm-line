@@ -79,6 +79,7 @@ def route(intent: str, message: str, user_name: str, user_id: str,
     from agents.general_agent       import handle as general_handle
     from agents.product_agent       import handle as product_handle
     from agents.subscription_agent  import handle as subscription_handle
+    from agents.engineer_agent      import handle as engineer_handle
 
     # Map each intent to its handler.
     # Set to None until that agent is built — will fall back to general.
@@ -86,8 +87,8 @@ def route(intent: str, message: str, user_name: str, user_id: str,
         "general":      general_handle,
         "product_info": product_handle,
         "subscription": subscription_handle,
+        "technical":    engineer_handle,
         "quotation":    None,   # agents/quotation_agent.py — coming soon
-        "technical":    None,   # agents/engineer_agent.py — coming soon
     }
 
     handler = agent_map.get(intent)

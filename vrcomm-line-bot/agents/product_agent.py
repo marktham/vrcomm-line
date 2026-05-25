@@ -5,16 +5,18 @@ Data source: vrcomm-line-bot/product/VRCOMM_ProductList.xlsx
   - Column A: Brand/Product name
   - Column B: Website URL
 
-Two-Step architecture (prevents Claude from hallucinating non-listed brands):
+Three-layer anti-hallucination architecture:
 
-  STEP 1 — SELECT:
-    Ask Claude: "From ONLY these 21 brands, which are relevant to this query?"
-    → Returns e.g. ["Hillstone Networks", "Sangfor", "Safetica", "Varonis"]
-    → Claude physically cannot pick Fortinet/Cisco because they're not in the list
+  STEP 1 — SELECT (Haiku, cheap):
+    "From ONLY these brands, which are relevant?" → returns exact brand names from list
 
-  STEP 2 — ANSWER:
-    Build system prompt with ONLY the selected brands.
-    Claude answers without ever seeing non-listed brands in context.
+  STEP 2 — ANSWER (Sonnet, reliable instruction-following):
+    Positive allowlist prompt: tells Claude EXACTLY which brands it may use.
+    Much stronger than just saying "don't use X".
+
+  STEP 3 — POST-PROCESSING (deterministic):
+    a) Forbidden-brand scan → retry with stricter prompt
+    b) If retry still fails → sentence-level strip (nuclear option)
 """
 import os, re, logging, time
 import requests
@@ -203,45 +205,82 @@ def _contains_forbidden_brand(text: str) -> str:
     return ""
 
 
-# ── STEP 2: Answer prompt (internal staff tone) ───────────────────────────────
+def _strip_forbidden_sentences(text: str) -> str:
+    """
+    Nuclear option: remove any sentence that contains a forbidden brand name.
+    Used only when retry still fails.
+    Splits on Thai/English sentence boundaries.
+    """
+    # Split on common sentence endings (. ! ? ครับ ค่ะ นะ) followed by whitespace
+    parts = re.split(r'(?<=[.!?\n])\s+', text)
+    clean = []
+    removed = []
+    for part in parts:
+        if _contains_forbidden_brand(part):
+            removed.append(part[:60])
+        else:
+            clean.append(part)
 
-_ANSWER_SYSTEM_WITH_MATCH = """You are a VRCOMM pre-sales engineer briefing an internal staff member.
-This is an INTERNAL conversation — not customer-facing.
+    if removed:
+        logger.warning("[product_agent] Stripped %d sentence(s) containing forbidden brands: %s",
+                       len(removed), removed)
 
-The relevant VRCOMM products for this query are listed below.
-These are the ONLY products you may discuss. Period.
+    result = " ".join(clean).strip()
+    # If we stripped everything, return a safe fallback
+    if not result:
+        return ("ขออภัยครับ ไม่สามารถให้ข้อมูลเพิ่มเติมได้ในขณะนี้ "
+                "กรุณาติดต่อทีม Pre-Sales โดยตรงครับ")
+    return result
 
+
+# ── STEP 2: Answer prompt (Sonnet — reliable instruction-following) ───────────
+
+# Positive-constraint approach: tell Claude EXACTLY which brands it CAN use,
+# rather than just listing what it cannot. This is more reliable.
+
+_ANSWER_SYSTEM_WITH_MATCH = """You are a VRCOMM pre-sales engineer giving an internal briefing to a colleague.
+VRCOMM is a Network and Cybersecurity solutions company in Thailand.
+This is an INTERNAL conversation — staff to staff, NOT customer-facing.
+
+══════════════════════════════════════════════════════
+ALLOWED BRANDS — you may ONLY discuss these, nothing else:
+{allowed_brand_names}
+
+Product details:
 {selected_brands_section}
+══════════════════════════════════════════════════════
 
-HARD RULES:
-- You may ONLY mention the brands listed above in your answer
-- FORBIDDEN brands (never mention these under any circumstances):
-  Fortinet, FortiGate, Cisco, Palo Alto, Check Point, Juniper, SonicWall,
-  Barracuda, Trend Micro, CrowdStrike, SentinelOne, or ANY brand not listed above
-- If you are tempted to suggest a product not in the list above — don't. Pick the closest match from the list instead.
-- NEVER quote specific prices — say: "ให้ Sales ดึง cost sheet แล้วทำ quote ได้เลยครับ"
-- Tone: direct, technical, colleague-to-colleague — not customer service language
+BEFORE you write anything, ask yourself: "Is every brand I am about to mention in the ALLOWED BRANDS list above?"
+If no → remove it from your answer.
+
+RULES:
+- Mention ONLY brands from the ALLOWED BRANDS list. Every single brand name in your reply must appear in that list.
+- Do NOT mention Fortinet, FortiGate, Cisco, Palo Alto, Check Point, Juniper, SonicWall, or any other brand outside the list — these are our competitors.
+- NEVER quote a price — say: "ให้ Sales ดึง cost sheet แล้วทำ quote ได้เลยครับ"
+- Tone: direct, technical, colleague-to-colleague — internal briefing, not customer service
 - Reply in the SAME LANGUAGE as the staff member (Thai → Thai, English → English)
 - Plain text only — no markdown, no bullets, no headers
 - Max 4-5 short paragraphs"""
 
-_ANSWER_SYSTEM_NO_MATCH = """You are a VRCOMM pre-sales engineer briefing an internal staff member.
-This is an INTERNAL conversation — not customer-facing.
+_ANSWER_SYSTEM_NO_MATCH = """You are a VRCOMM pre-sales engineer giving an internal briefing to a colleague.
+VRCOMM is a Network and Cybersecurity solutions company in Thailand.
+This is an INTERNAL conversation — staff to staff, NOT customer-facing.
 
-The staff member is asking about a product category or brand that VRCOMM does not carry.
+The query is about a product category VRCOMM does not directly carry under that brand name.
+Your job is to recommend the best alternatives from VRCOMM's actual portfolio.
 
-VRCOMM's complete product portfolio (ALL brands we sell — nothing else):
+══════════════════════════════════════════════════════
+VRCOMM's COMPLETE product portfolio (these are ALL brands we sell):
 {full_list}
+══════════════════════════════════════════════════════
 
-Your task:
-1. Confirm that VRCOMM does not carry the requested brand/product
-2. Recommend the best alternative(s) from the list above for the same use case
-3. If relevant, propose a combined solution using multiple brands from the list
+BEFORE you write anything, ask yourself: "Is every brand I am about to mention in the list above?"
+If no → remove it.
 
-HARD RULES:
-- Recommend ONLY brands from the list above — nothing outside it
-- FORBIDDEN: Fortinet, Cisco, Palo Alto, Check Point, or any brand NOT in the list
-- NEVER quote prices — say: "ให้ Sales ดึง cost sheet แล้วทำ quote ได้เลยครับ"
+RULES:
+- Recommend ONLY brands from the list above — every brand you name must be on that list
+- Do NOT mention Fortinet, Cisco, Palo Alto, Check Point, or any brand not on the list
+- NEVER quote a price — say: "ให้ Sales ดึง cost sheet แล้วทำ quote ได้เลยครับ"
 - Tone: direct, technical, internal briefing — not customer service
 - Reply in the SAME LANGUAGE as the staff member
 - Plain text only — max 4-5 short paragraphs"""
@@ -249,6 +288,11 @@ HARD RULES:
 
 def _build_answer_system(selected: list, product_list: list) -> str:
     if selected:
+        # Build explicit allowed-brand list (positive constraint)
+        allowed_brand_names = "\n".join(
+            "  - %s" % p["brand"] for p in selected
+        )
+
         # Build section with name + fetched web content
         sections = []
         for p in selected:
@@ -258,8 +302,10 @@ def _build_answer_system(selected: list, product_list: list) -> str:
                 section += "\nProduct info:\n%s" % content[:1500]
             sections.append(section)
         selected_brands_section = "\n\n---\n".join(sections)
+
         return _ANSWER_SYSTEM_WITH_MATCH.format(
-            selected_brands_section=selected_brands_section
+            allowed_brand_names=allowed_brand_names,
+            selected_brands_section=selected_brands_section,
         )
     else:
         full_list = "\n".join(
@@ -304,30 +350,42 @@ def handle(message: str, user_name: str, user_id: str,
     messages = history + [{"role": "user", "content": content}]
 
     try:
+        # STEP 2 uses Sonnet — far better instruction-following than Haiku
+        # when strict brand constraints must override strong training priors.
         response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model="claude-sonnet-4-6",
             max_tokens=768,
             system=system,
             messages=messages,
         )
         reply = response.content[0].text.strip()
 
-        # Post-processing safety net — retry once if forbidden brand detected
+        # ── Layer 2: Retry with Sonnet if forbidden brand still detected ─────
         forbidden = _contains_forbidden_brand(reply)
         if forbidden:
             logger.warning("[product_agent] Forbidden brand '%s' in reply — retrying", forbidden)
-            retry_system = system + (
-                "\n\nCRITICAL: Your previous answer mentioned '%s' which is NOT in VRCOMM's product list. "
-                "Rewrite the answer using ONLY the VRCOMM brands provided above." % forbidden
-            )
+            # Include the bad reply as context so Claude knows what NOT to do
+            retry_messages = messages + [
+                {"role": "assistant", "content": reply},
+                {"role": "user", "content": (
+                    "คำตอบของคุณเมนชั่น '%s' ซึ่งไม่มีในรายการสินค้า VRCOMM เลย "
+                    "กรุณาตอบใหม่โดยใช้เฉพาะสินค้าใน ALLOWED BRANDS list เท่านั้น "
+                    "ห้ามเมนชั่น %s หรือสินค้าอื่นที่ไม่อยู่ใน list" % (forbidden, forbidden)
+                )},
+            ]
             retry_resp = client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model="claude-sonnet-4-6",
                 max_tokens=768,
-                system=retry_system,
-                messages=messages,
+                system=system,
+                messages=retry_messages,
             )
             reply = retry_resp.content[0].text.strip()
             logger.info("[product_agent] Retry reply: %s", reply[:80])
+
+            # ── Layer 3: Sentence-level strip — nuclear last resort ────────
+            if _contains_forbidden_brand(reply):
+                logger.warning("[product_agent] Retry still has forbidden brand — stripping sentences")
+                reply = _strip_forbidden_sentences(reply)
 
         logger.info("[product_agent] replied to %s (selected=%s): %s",
                     user_name, [s["brand"] for s in selected], reply[:80])
