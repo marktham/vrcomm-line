@@ -401,6 +401,113 @@ def setup_email():
         return jsonify({"error": str(e)}), 500
 
 
+# ── SharePoint setup ─────────────────────────────────────────────────────────
+
+@app.route("/setup-sharepoint", methods=["GET"])
+def setup_sharepoint():
+    """
+    Lists all SharePoint sites accessible to the Azure app,
+    and tests reading the ProductSpecs folder if SHAREPOINT_SITE_ID is already set.
+
+    Visit: https://vrcomm-line.onrender.com/setup-sharepoint
+    """
+    import requests as req
+
+    ms_tenant_id     = os.environ.get("MS_TENANT_ID", "")
+    ms_client_id     = os.environ.get("MS_CLIENT_ID", "")
+    ms_client_secret = os.environ.get("MS_CLIENT_SECRET", "")
+    site_id          = os.environ.get("SHAREPOINT_SITE_ID", "")
+    specs_path       = os.environ.get("SHAREPOINT_SPECS_PATH", "ProductSpecs")
+
+    if not all([ms_tenant_id, ms_client_id, ms_client_secret]):
+        return jsonify({"error": "MS_TENANT_ID / MS_CLIENT_ID / MS_CLIENT_SECRET not set"}), 500
+
+    # Get access token
+    try:
+        token_resp = req.post(
+            "https://login.microsoftonline.com/%s/oauth2/v2.0/token" % ms_tenant_id,
+            data={
+                "grant_type":    "client_credentials",
+                "client_id":     ms_client_id,
+                "client_secret": ms_client_secret,
+                "scope":         "https://graph.microsoft.com/.default",
+            },
+            timeout=15,
+        )
+        token_resp.raise_for_status()
+        token = token_resp.json()["access_token"]
+    except Exception as e:
+        return jsonify({"error": "Token failed: %s" % str(e)}), 500
+
+    headers = {"Authorization": "Bearer " + token}
+
+    result = {
+        "instructions": (
+            "1. Find your site below under 'available_sites'. "
+            "2. Copy the 'id' of the site you want. "
+            "3. Add SHAREPOINT_SITE_ID=<that id> to Render environment variables. "
+            "4. Add SHAREPOINT_SPECS_PATH=ProductSpecs (or your folder name). "
+            "5. Visit this page again to verify."
+        ),
+        "current_config": {
+            "SHAREPOINT_SITE_ID":    site_id or "(not set)",
+            "SHAREPOINT_SPECS_PATH": specs_path,
+        },
+        "available_sites": [],
+        "specs_folder_test": None,
+    }
+
+    # List all sites the app can access
+    try:
+        sites_resp = req.get(
+            "https://graph.microsoft.com/v1.0/sites?search=*",
+            headers=headers,
+            timeout=15,
+        )
+        sites_resp.raise_for_status()
+        for s in sites_resp.json().get("value", []):
+            result["available_sites"].append({
+                "name":        s.get("displayName", ""),
+                "hostname":    s.get("siteCollection", {}).get("hostname", ""),
+                "id":          s.get("id", ""),
+                "web_url":     s.get("webUrl", ""),
+            })
+    except Exception as e:
+        result["available_sites"] = "Error: %s" % str(e)
+
+    # If site_id is set, test the specs folder
+    if site_id:
+        try:
+            folder_url = (
+                "https://graph.microsoft.com/v1.0"
+                "/sites/%s/drive/root:/%s:/children" % (site_id, specs_path)
+            )
+            folder_resp = req.get(folder_url, headers=headers, timeout=15)
+            folder_resp.raise_for_status()
+            items = folder_resp.json().get("value", [])
+            result["specs_folder_test"] = {
+                "status":  "OK",
+                "path":    "Documents/%s" % specs_path,
+                "folders": [
+                    i["name"] for i in items if i.get("folder") is not None
+                ],
+                "files": [
+                    i["name"] for i in items if i.get("file") is not None
+                ],
+            }
+        except Exception as e:
+            result["specs_folder_test"] = {
+                "status": "ERROR — folder not found or no permission",
+                "detail": str(e),
+                "hint": (
+                    "Make sure the '%s' folder exists in the site's Documents library, "
+                    "and the Azure app has Sites.Read.All permission." % specs_path
+                ),
+            }
+
+    return jsonify(result)
+
+
 # ── Export & health ───────────────────────────────────────────────────────────
 
 @app.route("/export", methods=["GET"])
