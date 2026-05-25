@@ -475,7 +475,7 @@ def setup_sharepoint():
     except Exception as e:
         result["available_sites"] = "Error: %s" % str(e)
 
-    # If site_id is set, test the specs folder
+    # If site_id is set, test the specs folder and drill into each brand subfolder
     if site_id:
         try:
             folder_url = (
@@ -485,15 +485,42 @@ def setup_sharepoint():
             folder_resp = req.get(folder_url, headers=headers, timeout=15)
             folder_resp.raise_for_status()
             items = folder_resp.json().get("value", [])
+
+            brand_folders = [i["name"] for i in items if i.get("folder") is not None]
+            root_files    = [i["name"] for i in items if i.get("file") is not None]
+
+            # Drill into each brand subfolder to check for spec files
+            brands_with_files   = {}
+            brands_missing_files = []
+            for brand in brand_folders:
+                try:
+                    brand_url = (
+                        "https://graph.microsoft.com/v1.0"
+                        "/sites/%s/drive/root:/%s/%s:/children" % (site_id, specs_path, brand)
+                    )
+                    brand_resp = req.get(brand_url, headers=headers, timeout=10)
+                    if brand_resp.status_code == 200:
+                        brand_items = brand_resp.json().get("value", [])
+                        spec_files = [
+                            f["name"] for f in brand_items
+                            if f.get("file") is not None and f["name"].endswith((".txt", ".md"))
+                        ]
+                        if spec_files:
+                            brands_with_files[brand] = spec_files
+                        else:
+                            brands_missing_files.append(brand)
+                    else:
+                        brands_missing_files.append(brand)
+                except Exception:
+                    brands_missing_files.append(brand)
+
             result["specs_folder_test"] = {
-                "status":  "OK",
-                "path":    "Documents/%s" % specs_path,
-                "folders": [
-                    i["name"] for i in items if i.get("folder") is not None
-                ],
-                "files": [
-                    i["name"] for i in items if i.get("file") is not None
-                ],
+                "status":               "OK",
+                "path":                 "Documents/%s" % specs_path,
+                "summary":              "%d/%d brands have spec files" % (len(brands_with_files), len(brand_folders)),
+                "brands_with_files":    brands_with_files,
+                "brands_missing_files": brands_missing_files,
+                "root_files":           root_files,
             }
         except Exception as e:
             result["specs_folder_test"] = {
