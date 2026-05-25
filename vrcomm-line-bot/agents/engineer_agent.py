@@ -17,9 +17,9 @@ Three-layer anti-hallucination (same pattern as product_agent):
   Step 3: Post-processing — forbidden-brand scan → retry → sentence strip
 
 SharePoint config (environment variables):
-  SHAREPOINT_SITE_ID     — Graph API site ID (from /sites endpoint)
+  SHAREPOINT_SITE_ID     — Graph API site ID (visit /setup-sharepoint to find it)
   SHAREPOINT_SPECS_PATH  — folder path inside Documents, e.g. "ProductSpecs"
-  (Uses same AZURE_CLIENT_ID / AZURE_CLIENT_SECRET / AZURE_TENANT_ID as email_handler)
+  (Uses same MS_CLIENT_ID / MS_CLIENT_SECRET / MS_TENANT_ID as email_handler)
 """
 import os, re, logging, time
 import requests
@@ -180,13 +180,13 @@ _SP_CACHE_TTL = 3600         # 1 hour
 def _get_graph_token() -> str:
     """Get Microsoft Graph API access token (cached). Same credentials as email_handler."""
     now = time.time()
-    cached = _sp_token_cache.get("token")
-    if cached and now < _sp_token_cache.get("expires_at", 0) - 60:
-        return cached
+    if _sp_token_cache.get("token") and now < _sp_token_cache.get("expires_at", 0) - 60:
+        return _sp_token_cache["token"]
 
-    tenant_id     = os.environ.get("AZURE_TENANT_ID", "")
-    client_id     = os.environ.get("AZURE_CLIENT_ID", "")
-    client_secret = os.environ.get("AZURE_CLIENT_SECRET", "")
+    # Use same env var names as email_handler.py
+    tenant_id     = os.environ.get("MS_TENANT_ID", "")
+    client_id     = os.environ.get("MS_CLIENT_ID", "")
+    client_secret = os.environ.get("MS_CLIENT_SECRET", "")
 
     if not all([tenant_id, client_id, client_secret]):
         return ""
@@ -205,9 +205,8 @@ def _get_graph_token() -> str:
         resp.raise_for_status()
         data = resp.json()
         token = data.get("access_token", "")
-        expires_in = data.get("expires_in", 3600)
         _sp_token_cache["token"]      = token
-        _sp_token_cache["expires_at"] = now + expires_in
+        _sp_token_cache["expires_at"] = now + data.get("expires_in", 3600)
         return token
     except Exception as e:
         logger.warning("[engineer_agent] Graph token error: %s", e)
