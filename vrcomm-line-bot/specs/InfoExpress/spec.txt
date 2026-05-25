@@ -1,0 +1,99 @@
+INFOEXPRESS — Product Spec Sheet
+Website: https://www.vrcomm.net/product-detail?id=10
+Vendor site: https://www.infoexpress.com/
+Category: Network Access Control (NAC), Endpoint Compliance, IoT Security
+
+PRODUCT OVERVIEW
+================
+InfoExpress CyberGatekeeper is a Network Access Control (NAC) solution that
+controls which devices can connect to the network based on identity and security posture.
+It ensures only compliant, authorised devices gain access — blocking non-compliant,
+unknown, or infected endpoints from the corporate network.
+
+PRODUCT: CyberGatekeeper
+========================
+
+1. Network Access Control (NAC) Core
+   - 802.1X authentication: enforce certificate or credential-based port access
+   - MAC-based authentication: for non-802.1X capable devices
+   - VLAN assignment: dynamically place devices into correct VLAN based on role/compliance
+   - Quarantine VLAN: isolate non-compliant devices to remediation network
+   - Guest access: self-service guest portal with time-limited access
+   - Agentless mode: detect and control devices without installing agent
+
+2. Endpoint Posture Assessment
+   - Check device health before granting network access:
+     - OS patch level (Windows Update status)
+     - Antivirus installed and up-to-date
+     - Disk encryption enabled (BitLocker)
+     - Required software present
+     - Firewall enabled
+   - Agent-based (CyberGatekeeper Agent) or agentless (for BYOD/IoT)
+   - Pass/Fail/Remediate decision per device
+
+3. IoT & OT Device Visibility
+   - Discover and fingerprint all devices on the network (IP cameras, printers, IoT sensors, medical devices)
+   - Classify devices by type, vendor, OS
+   - Assign IoT devices to dedicated IoT VLAN automatically
+   - Alert on unknown device types or new MAC addresses
+
+4. BYOD Control
+   - Separate policy for personal (BYOD) vs corporate devices
+   - BYOD: route to internet-only VLAN, block access to internal resources
+   - Certificate-based differentiation: corporate devices have PKI cert, BYOD do not
+   - Self-registration portal for authorised BYOD enrollment
+
+5. Integration with Directory Services
+   - Active Directory: user + group-based access policy
+   - RADIUS server: built-in or integration with existing RADIUS (Microsoft NPS)
+   - LDAP: user lookup for policy enforcement
+
+KEY FEATURES
+============
+- Supports wired + wireless + VPN (Remote Access NAC)
+- Agentless IoT profiling: detect device type from DHCP fingerprint, MAC OUI, HTTP user-agent
+- Multi-vendor switch support: works with any 802.1X-capable switch
+- Remediation workflow: direct users to self-service remediation page
+- API: REST API for SIEM integration, ticketing, and orchestration
+
+TECHNICAL REQUIREMENTS
+======================
+- CyberGatekeeper Server: Windows Server 2016+ or Linux VM
+  Minimum: 4 CPU, 8 GB RAM, 100 GB storage
+- Network: CyberGatekeeper communicates with switches via RADIUS (UDP 1812/1813)
+- Switches: any 802.1X-capable managed switch (Cisco, HP, Ruckus, etc.)
+- Agent (optional): Windows 7+, macOS 10.14+
+
+LICENSING
+=========
+- Per concurrent endpoint per year
+- Modules: Base NAC + IoT visibility + BYOD portal — can be licensed separately
+- Support: standard or premium (24x7)
+
+SIZING GUIDE
+============
+- Up to 200 endpoints   : Small deployment, single server
+- 200-1,000 endpoints   : Standard VM
+- 1,000-5,000 endpoints : Medium VM + external database
+- 5,000+ endpoints      : Distributed with remote enforcement points
+
+COMPLIANCE ALIGNMENT
+====================
+- ISO 27001: A.9 — Access control
+- PDPA: ensure only authorised staff can access networks handling personal data
+- PCI-DSS: Requirement 1 — network access control for cardholder data environment
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Prevent unauthorised laptops from connecting to corporate LAN
+- IoT/IP camera isolation: auto-place cameras in dedicated VLAN
+- Guest WiFi with captive portal
+- Remote Access NAC: check VPN user device posture before granting access
+- Contractor access control: time-limited VLAN access for vendors
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- InfoExpress + Entrust PKI: Entrust issues device certificates, InfoExpress checks cert for 802.1X auth
+- InfoExpress + Hillstone/Sangfor NGFW: NAC handles switch-level access, NGFW handles inter-VLAN policy
+- InfoExpress + LogPoint: NAC authentication events and quarantine actions forwarded to SIEM
+- InfoExpress + Sophos Intercept X: Sophos provides posture data (AV status) to InfoExpress for compliance check

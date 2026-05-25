@@ -1,0 +1,97 @@
+A10 NETWORKS — Product Spec Sheet
+Website: https://www.a10networks.com/
+Category: Application Delivery Controller (ADC), Load Balancer, DDoS Protection, SSL/TLS
+
+PRODUCT OVERVIEW
+================
+A10 Networks provides high-performance Application Delivery Controllers (ADC),
+load balancers, DDoS mitigation, and SSL/TLS offloading for enterprise and service provider environments.
+
+PRODUCT FAMILIES
+================
+
+1. Thunder ADC (Application Delivery Controller)
+   - Layer 4-7 load balancing (server load balancing, global server load balancing)
+   - SSL/TLS offloading and inspection (including TLS 1.3)
+   - Web Application Firewall (WAF) module
+   - Application acceleration: HTTP/2, caching, compression
+   - GSLB (Global Server Load Balancing) for multi-site HA
+
+   Hardware models:
+   - Thunder 930S  : 5 Gbps, small enterprise / branch
+   - Thunder 1030S : 10 Gbps, mid-market
+   - Thunder 2030S : 20 Gbps, enterprise
+   - Thunder 3030S : 40 Gbps, large enterprise
+   - Thunder 4430S : 80 Gbps, data center / carrier
+   - Thunder 5430S : 120 Gbps, high-density DC
+
+   Virtual ADC (vThunder):
+   - Runs on VMware ESXi, KVM, Microsoft Hyper-V
+   - Also available on AWS, Azure, GCP
+   - Throughput tiers: 1 Gbps / 2 Gbps / 5 Gbps / 10 Gbps vThunder
+
+2. Thunder TPS (DDoS Protection System)
+   - Volumetric DDoS mitigation: absorbs and scrubs DDoS traffic on-premise
+   - Detection: signature-based + behavioral anomaly
+   - Protects against: UDP flood, SYN flood, HTTP flood, DNS amplification, IoT botnets
+   - Thunder TPS 2025S : 20 Gbps mitigation capacity
+   - Thunder TPS 3035S : 40 Gbps
+   - Thunder TPS 5435S : 100 Gbps
+   - Integration with upstream ISP scrubbing for volumetric attacks >100 Gbps
+
+3. Thunder SSLi (SSL Inspection)
+   - Dedicated SSL/TLS decrypt/re-encrypt appliance
+   - Provides decrypted traffic to inline security tools (IDS/IPS, DLP, sandbox)
+   - Passive tap-mode or inline-mode
+   - Handles TLS 1.3 perfect forward secrecy (PFS) traffic
+   - Removes need to configure SSL inspection on every security device
+
+4. Harmony Controller
+   - Centralized management for all A10 Thunder devices
+   - Analytics dashboard, configuration templates, compliance reporting
+   - REST API for automation/DevOps integration
+
+KEY FEATURES (ADC)
+==================
+- Server health monitoring: TCP, HTTP, HTTPS, custom health checks
+- Persistence: source IP, cookie, SSL session ID
+- L7 content switching: route based on URL, HTTP header, domain
+- Rate limiting: per-client / per-server / per-virtual-service
+- IPv4/IPv6 dual stack and NAT64/DNS64
+- Scripting: aXAPI (REST), aFleX (Tcl-based)
+
+TECHNICAL REQUIREMENTS
+======================
+- Hardware appliance: 1U or 2U rack mount
+- Management: CLI (SSH), Web GUI (ACOS GUI), REST API
+- High Availability: Active-Standby or Active-Active via VRRP-A
+- Network modes: One-arm (proxy), Two-arm (inline), DSR (Direct Server Return)
+
+LICENSING
+=========
+- Hardware: perpetual purchase + annual support/maintenance
+- Virtual (vThunder): subscription per-throughput-tier per year
+- Modules: WAF, SSL Inspection, GSLB — each as add-on license
+- DDoS TPS: separate product line, purchased separately
+
+SIZING GUIDE (ADC / Load Balancer)
+===================================
+- Up to 1,000 req/sec (small web farm)    : Thunder 930S or vThunder 1G
+- 1,000-5,000 req/sec (medium e-commerce) : Thunder 1030S
+- 5,000-20,000 req/sec (large portal)     : Thunder 2030S / 3030S
+- 20,000+ req/sec (banking / telco)       : Thunder 4430S / 5430S or cluster
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Load balance web servers / application servers for high availability
+- SSL offloading to reduce CPU load on application servers
+- On-premise DDoS protection (TPS) for critical infrastructure
+- SSL inspection to feed decrypted traffic to IPS/DLP
+- GSLB for disaster recovery failover between two data centers
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- A10 ADC + Hillstone/Sangfor NGFW: ADC in front, NGFW behind for layered protection
+- A10 SSLi + LogPoint SIEM: SSLi decrypts traffic, sends to IDS/SIEM for inspection
+- A10 TPS + Hillstone Networks: A10 handles volumetric DDoS, Hillstone handles application-layer attacks
+- A10 ADC + Ubika WAF: A10 for load balancing, Ubika for deep web application protection

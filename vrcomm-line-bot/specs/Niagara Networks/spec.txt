@@ -1,0 +1,86 @@
+NIAGARA NETWORKS — Product Spec Sheet
+Website: https://www.niagaranetworks.com/
+Category: Network Visibility, Packet Broker, Network TAP, Bypass Switch
+
+PRODUCT OVERVIEW
+================
+Niagara Networks provides Network Visibility infrastructure — the physical and logical layer
+that copies, aggregates, filters, and distributes network traffic to security and monitoring tools.
+It solves the "how do I get traffic to my security tools without affecting production" problem.
+
+PRODUCT FAMILIES
+================
+
+1. Network TAPs (Test Access Points)
+   - Passive TAP: splits fibre/copper traffic — one copy to production, one copy to monitoring tool
+   - No power = no traffic impact (failsafe pass-through on power loss)
+   - Types:
+     - Optical TAP: for fibre links (1G, 10G, 40G, 100G)
+     - Copper TAP: for 1G copper (RJ45) links
+     - Regeneration TAP: splits one link into multiple monitoring copies
+   - Use case: send a copy of internet edge traffic to IDS/IPS, NetEvid, LogPoint
+
+2. Packet Brokers (Network Packet Broker — NPB)
+   - Aggregates traffic from multiple TAPs or SPAN ports into one feed
+   - Filters: send only relevant traffic to each tool (e.g., only HTTP to web proxy, only DNS to DNS monitor)
+   - Load balancing: distribute traffic across multiple instances of a tool
+   - Deduplication: remove duplicate packets before sending to monitoring tools
+   - Header stripping: remove VLAN tags, MPLS labels for tools that cannot handle them
+   - Tunnelling: encapsulate and forward traffic to remote monitoring tools (ERSPAN, VXLAN)
+   - Models: 1G/10G/40G/100G form factors, 1U to 4U chassis
+
+3. Bypass Switch
+   - Inline protection for security appliances (IPS, WAF, SSL inspection)
+   - If inline tool fails or goes offline → bypass switch automatically fails open (traffic continues)
+   - Prevents network downtime when security appliance fails or is rebooted
+   - Heartbeat monitoring: send test packets to inline tool, fail over if no response
+   - Supports: 1G copper, 10G fibre, 40G fibre inline deployments
+
+4. SSL/TLS Decryption (Visibility to Encrypted Traffic)
+   - Decrypt HTTPS/TLS traffic once, distribute decrypted copy to multiple tools
+   - Re-encrypt after inspection (maintain end-to-end security appearance)
+   - Reduces load on individual security tools (each tool doesn't need its own SSL engine)
+   - Certificate management: import organisation's private keys or use forward proxy mode
+
+5. Cloud Visibility
+   - Virtual packet broker for AWS, Azure, GCP
+   - Aggregate and filter VPC traffic mirror feeds
+   - Same filtering and distribution capabilities as physical NPB
+
+KEY FEATURES
+============
+- Zero-latency TAP: hardware-based, no software processing delay
+- High availability: redundant power, hot-swap modules on chassis models
+- Centralised management: Niagara Networks Visibility Manager (NVM) web console
+- REST API: automation of filter rules and tool mapping
+- SNMP/syslog: forward TAP/NPB health status to NMS
+
+TECHNICAL REQUIREMENTS
+======================
+- TAP: passive hardware, no configuration required
+- Packet Broker: 1U-4U rack appliance, managed via web UI or CLI (SSH)
+- Power: redundant PSU available on enterprise models
+- Bypass Switch: inline deployment between firewall/router and inline security tool
+
+LICENSING
+=========
+- TAPs: hardware purchase, no ongoing license
+- Packet Brokers: hardware purchase + optional advanced features license (SSL decryption, advanced filtering)
+- Bypass Switch: hardware purchase
+- Annual support/maintenance for firmware updates
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Copy internet edge traffic to IDS/NetEvid/LogPoint without touching live network
+- Distribute one traffic feed to multiple tools: SIEM + NDR + packet capture simultaneously
+- Inline IPS/WAF protection with bypass failsafe
+- SSL inspection without modifying firewall
+- Data centre east-west traffic monitoring (between server VLANs)
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- Niagara + NetEvid: Niagara TAP feeds 100% of traffic to NetEvid for full packet capture
+- Niagara + LogPoint: Niagara NPB filters and aggregates relevant traffic to LogPoint for SIEM
+- Niagara + Hillstone iSource: distribute flow data from multiple points to Hillstone NDR
+- Niagara + Ubika WAF: bypass switch protects Ubika WAF — auto fail-open if WAF reboots
+- Niagara + A10 SSLi: A10 handles SSL decryption, Niagara distributes decrypted copy to tools

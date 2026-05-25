@@ -1,0 +1,88 @@
+SAFETICA — Product Spec Sheet
+Website: https://www.safetica.com/
+Category: Data Loss Prevention (DLP), Insider Threat Protection
+
+PRODUCT OVERVIEW
+================
+Safetica is a Data Loss Prevention (DLP) and insider threat solution designed for Windows-based environments.
+It monitors, controls, and protects sensitive data across endpoints, email, cloud storage, and removable devices.
+
+PRODUCT TIERS
+=============
+
+1. Safetica ONE (Endpoint DLP)
+   - Data discovery: automatically finds and classifies sensitive data on endpoints
+   - Data classification: based on content, file type, location, regex patterns
+   - Policy enforcement: block, allow, or log data transfers
+   - Channels monitored:
+       - Removable devices (USB, external drives)
+       - Cloud storage (OneDrive, Dropbox, Google Drive, Box)
+       - Email (Outlook + webmail)
+       - Web upload (browser-based)
+       - Print / screenshot
+       - Local copy to unmanaged folders
+   - Incident management: review policy violations in management console
+
+2. Safetica NXT (Cloud-native DLP — SaaS)
+   - All features of Safetica ONE, delivered as SaaS
+   - No on-premise server required
+   - Deployment via Safetica cloud management console
+   - Suitable for distributed/remote workforce
+   - Integrates with Microsoft 365 (Exchange Online, SharePoint, Teams)
+   - Agent-based (Windows agent, macOS support in newer versions)
+
+3. Safetica DLP for Microsoft 365
+   - Protects data in Exchange Online, SharePoint Online, OneDrive, Teams
+   - Content inspection for emails and file uploads
+   - Policy-based blocking for external sharing
+   - Works alongside Safetica NXT
+
+KEY FEATURES
+============
+- Content-aware DLP: detect PII, credit card, passport numbers, custom patterns
+- Behavior analytics: unusual data transfer volumes, access outside business hours
+- Audit log: full history of all data movement (who, what, when, where)
+- Risk score: per-user risk scoring for insider threat monitoring
+- GDPR/PDPA compliance: helps document data handling for audit
+- Shadow IT detection: identify unauthorized cloud app usage
+- Removable device management: whitelist by device serial / vendor ID
+- Email DLP: auto-classify and enforce policies on outbound email attachments
+
+TECHNICAL REQUIREMENTS
+======================
+- Agent: Windows 7 SP2 / Windows 10 / Windows 11, Windows Server 2012+
+- Deployment: on-premise server (Safetica ONE) or SaaS (Safetica NXT)
+- On-premise server: Windows Server, SQL Server (Express or full), min 8 GB RAM, 100 GB storage
+- Network: agent communicates with management server on TCP 4438
+- Active Directory integration for user/group management
+- No reboot required for agent installation
+- macOS support: limited (NXT tier, newer releases)
+
+LICENSING
+=========
+- Per endpoint per year subscription
+- Safetica ONE: requires on-prem management server license + per-seat
+- Safetica NXT: fully per-seat SaaS, no server license
+- Volume pricing available (typically 50-seat minimum for competitive pricing)
+- Add-on: Safetica DLP for Microsoft 365 (per user/year)
+
+SIZING CONSIDERATIONS
+=====================
+- Small deployment (20-100 seats): Safetica NXT (SaaS) recommended — no server to manage
+- Medium deployment (100-500 seats): Safetica ONE on-prem or NXT
+- Large deployment (500+ seats): Safetica ONE on-prem with dedicated SQL Server
+- Microsoft 365 heavy environment: add Safetica DLP for M365
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- PDPA compliance: control and audit personal data handling
+- Prevent data exfiltration via USB / email / cloud upload
+- Insider threat monitoring for finance, HR, R&D departments
+- Remote work DLP for employees using company laptops outside office
+- Complement to existing NGFW — endpoint-level data control that firewall cannot provide
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- Safetica + Varonis: Safetica for endpoint DLP, Varonis for file server / cloud data classification
+- Safetica + Sophos Intercept X: DLP layer on top of endpoint security
+- Safetica + LogPoint: feed DLP incidents to SIEM for correlation

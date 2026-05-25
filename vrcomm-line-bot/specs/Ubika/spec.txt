@@ -1,0 +1,109 @@
+UBIKA — Product Spec Sheet
+Website: https://www.ubikasec.com/en/
+Category: Web Application Firewall (WAF), API Security, Bot Management, WAAP
+
+PRODUCT OVERVIEW
+================
+Ubika (formerly Rohde & Schwarz Cybersecurity WAF) provides a Web Application and API Protection (WAAP)
+platform to protect web applications and APIs from OWASP Top 10, zero-day, and bot-driven attacks.
+It is available as hardware appliance, virtual appliance, or cloud SaaS.
+
+PRODUCT: UBIKA WAAP (Web Application & API Protection)
+=======================================================
+
+1. Web Application Firewall (WAF)
+   - OWASP Top 10 protection: SQL injection, XSS, CSRF, path traversal, etc.
+   - Signature-based detection: 2,000+ attack signatures, updated continuously
+   - Behavioral analysis: detect anomalies based on normal traffic baseline
+   - Virtual patching: block known CVEs in web applications without modifying source code
+   - Positive security model: whitelist expected request parameters, block everything else
+   - Custom rules: write WAF rules in Ubika rule language
+
+2. API Security
+   - API discovery: automatically detect API endpoints from traffic
+   - OpenAPI / Swagger spec import: validate requests against API specification
+   - Parameter enforcement: type, format, range validation for API parameters
+   - Sensitive data masking: detect and mask PII, credit card numbers in API responses
+   - JWT/OAuth validation: enforce correct token structure and signature
+
+3. Bot Management
+   - Bot classification: good bots (Google, Bing) vs. bad bots (scrapers, credential stuffers)
+   - CAPTCHA challenge for suspicious clients
+   - JavaScript browser fingerprinting: detect headless browsers and automation tools
+   - Credential stuffing protection: detect and block login brute-force from bot networks
+   - Rate limiting per IP, per user, per API endpoint
+
+4. DDoS Protection (L7)
+   - Application-layer DDoS: HTTP flood mitigation
+   - Rate limiting and challenge-response for L7 attacks
+   - Works alongside upstream volumetric DDoS protection (A10 TPS)
+
+5. SSL/TLS Termination
+   - Offload HTTPS from backend servers
+   - Enforce TLS 1.2+ (disable old TLS 1.0/1.1)
+   - Certificate management: upload and manage SSL certificates for protected domains
+   - HSTS enforcement
+
+6. Reverse Proxy & Load Balancing (Basic)
+   - Route requests to backend server pools
+   - Health check for backend servers
+   - Session persistence (cookie-based)
+
+KEY FEATURES
+============
+- Learning mode: automatically build whitelist rules from observed normal traffic
+- Negative + Positive security model: use both together for maximum protection
+- False positive management: easy rule tuning through traffic analysis
+- Inline or out-of-band (ICAP) deployment options
+- REST API: manage WAF policies via API (DevSecOps integration)
+- Compliance: PCI-DSS Requirement 6.4 (WAF for cardholder data environment)
+
+DEPLOYMENT OPTIONS
+==================
+- Hardware appliance: UBIKA series (1G, 5G, 10G models)
+- Virtual appliance: VMware ESXi, KVM, Microsoft Hyper-V
+- Cloud: AWS Marketplace, Azure Marketplace
+- SaaS (Ubika Cloud WAF): managed WAF, DNS-based onboarding
+
+TECHNICAL REQUIREMENTS
+======================
+- Hardware: 1U rack server (Ubika provides dedicated appliance)
+- Virtual: 4-8 CPU, 16 GB RAM, 100 GB disk for standard deployment
+- Network: deployed in front of web servers (inline reverse proxy mode)
+- DNS change: point domain to Ubika WAF IP (for reverse proxy deployment)
+
+LICENSING
+=========
+- Per protected web application / domain per year
+- Throughput-based: pricing tiers by Mbps of protected traffic
+- Modules: base WAF + API security + bot management — can be bundled
+- Hardware appliance: hardware purchase + annual software subscription
+- SaaS: monthly or annual per-application subscription
+
+SIZING GUIDE
+============
+- 1-5 web apps, low traffic    : Virtual appliance, 4 CPU/16 GB RAM
+- 5-20 web apps, medium traffic: Hardware appliance (5G model) or dedicated VM
+- 20+ web apps / high traffic  : Hardware (10G model) or SaaS
+
+PCI-DSS ALIGNMENT
+=================
+- Requirement 6.4: WAF required for public-facing web applications
+- Ubika provides: blocking mode WAF, audit logging, alerting — meets PCI-DSS requirement
+- QSA audit support: Ubika can generate compliance reports
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Protect web portals and e-commerce from OWASP attacks
+- API security for banking/fintech: protect REST APIs from parameter manipulation
+- Bot defence: block credential stuffing on login pages
+- PCI-DSS compliance: WAF as required control for web applications
+- Virtual patching: protect legacy web apps with known vulnerabilities while waiting for fix
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- Ubika + A10 Networks: A10 handles load balancing and SSL offload, Ubika handles WAF inspection
+- Ubika + Niagara Bypass Switch: bypass switch ensures network continues if Ubika WAF fails
+- Ubika + LogPoint: WAF attack logs forwarded to LogPoint SIEM
+- Ubika + Cyfirma: Cyfirma provides malicious IP feeds, Ubika enforces block on WAF
+- Ubika + Hillstone/Sangfor NGFW: Ubika protects web tier, NGFW protects network perimeter

@@ -1,0 +1,99 @@
+VARONIS — Product Spec Sheet
+Website: https://www.varonis.com/
+Category: Data Security Platform, DSPM, Insider Threat, Ransomware Protection
+
+PRODUCT OVERVIEW
+================
+Varonis is a Data Security Platform (DSP/DSPM) that discovers, classifies, and protects sensitive data
+stored in file servers, cloud storage, SaaS applications, and on-premise systems.
+Core strength: visibility into WHO has access to data, WHO is accessing it, and detecting abnormal behavior.
+
+PRODUCT MODULES (sold as platform bundles)
+==========================================
+
+1. DatAdvantage — Core Data Visibility & Access Intelligence
+   - Maps all permissions on file servers and cloud storage
+   - Shows: who has access vs. who actually uses it
+   - Identifies overexposed data (data accessible to "Everyone" / all employees)
+   - Produces remediation recommendations: revoke excessive access
+   - Supported platforms: Windows File Servers (SMB), SharePoint, OneDrive, Exchange, Box, Salesforce, AWS S3, Azure Blob
+
+2. Data Classification Engine
+   - Automatically scans and tags files containing:
+     - PII (name, ID card, passport, phone, email)
+     - Financial data (credit card, bank account)
+     - Healthcare data
+     - Custom regex/keyword patterns (e.g., Thai PDPA data types)
+   - Tags files in-place (no data movement)
+   - Provides classification heatmap by folder/department
+
+3. DatAlert — Threat Detection & User Behavior Analytics (UBA)
+   - Baseline normal user behavior (access patterns, copy/delete volumes)
+   - Alert on anomalies:
+     - Mass file deletion (ransomware indicator)
+     - Abnormal data export (insider exfiltration)
+     - Access from unusual location/time
+     - Privilege escalation
+   - 200+ built-in threat models
+   - MITRE ATT&CK alignment
+
+4. Automation Engine
+   - Auto-remediation of access control issues
+   - Workflow: request → approve → grant → expire temporary access
+   - Data owner self-service: let data owners review and revoke their own data access
+
+5. Varonis for SaaS (DatAdvantage Cloud)
+   - Extends visibility to: Microsoft 365, Google Workspace, Salesforce, Slack, GitHub, Zoom, Box
+   - Identify risky OAuth app connections
+   - Monitor SaaS app permission sprawl
+   - Alert on SaaS data exfiltration events
+
+6. MDDR (Managed Data Detection & Response)
+   - Varonis SOC analysts monitor customer environments 24/7
+   - Proactive threat hunting on Varonis telemetry
+   - Incident investigation and containment guidance
+
+KEY CAPABILITIES
+================
+- Data discovery across on-prem + cloud + SaaS from single platform
+- Automated PDPA/GDPR data mapping for compliance audits
+- Least-privilege remediation: systematic reduction of excess access
+- Ransomware detection: detects encryption behavior, auto-locks affected user account
+- Active Directory monitoring: stale accounts, group membership changes, privilege changes
+
+TECHNICAL REQUIREMENTS
+======================
+- Varonis collector (agent): installed on each monitored file server / domain controller
+- Varonis management server: Windows Server 2016+, SQL Server, min 16 GB RAM, 500 GB+ storage
+- Agentless for cloud/SaaS (API-based connectors)
+- Network: collector communicates with management server over TCP 8080/443
+- No changes needed to existing file server permissions or shares
+
+LICENSING
+=========
+- Per-user per-year subscription (based on total Active Directory users)
+- Bundle tiers: DatAdvantage → DatAdvantage + Classification → Full Platform (all modules)
+- Add-ons: MDDR (managed service), SaaS modules per application
+- Minimum deployment: typically 100+ users to be cost-effective
+
+SIZING CONSIDERATIONS
+=====================
+- 100-500 users: single management server deployment
+- 500-5,000 users: may need dedicated SQL Server + more storage
+- Data volume: 1 TB per billion files scanned (approx.)
+- Collector per file server: 1 Varonis collector per Windows File Server node
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- PDPA compliance: discover where personal data lives, who can access it, and produce audit reports
+- Ransomware protection: detect and contain ransomware spread at data layer
+- Insider threat: detect employees exfiltrating data before resignation
+- Access cleanup: reduce attack surface by removing stale/excess permissions
+- Mergers/acquisitions: understand data exposure in acquired company
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- Varonis + Safetica: Varonis for data repos/servers, Safetica for endpoint data movement
+- Varonis + LogPoint: Varonis alerts fed into SIEM for correlation with network events
+- Varonis + Wallix: Varonis detects privilege abuse, Wallix controls privileged session access
+- Varonis + Trellix: Varonis data layer + Trellix XDR for full kill-chain visibility

@@ -1,0 +1,97 @@
+ARCSERVE — Product Spec Sheet
+Website: https://www.arcserve.com/
+Category: Backup, Disaster Recovery, Ransomware Protection, Business Continuity
+
+PRODUCT OVERVIEW
+================
+Arcserve is a data protection and business continuity platform covering backup,
+disaster recovery, and ransomware-resilient storage for physical, virtual, and cloud environments.
+
+PRODUCT FAMILIES
+================
+
+1. Arcserve UDP (Unified Data Protection) — Flagship Backup & DR
+   - Agent-based backup for Windows/Linux physical servers
+   - Agentless backup for VMware vSphere and Microsoft Hyper-V
+   - Instant VM recovery: spin up backup as live VM in minutes (on-premise or cloud)
+   - Granular restore: individual files, folders, Exchange mailboxes, SQL databases, AD objects
+   - Deduplication + compression (global dedup across all backup jobs)
+   - Backup destinations: local disk, NAS, tape, Arcserve Cloud, AWS S3, Azure Blob
+   - Immutable backup storage: WORM-protected copies to prevent ransomware encryption
+   - Replication: site-to-site replication for DR
+
+   Editions:
+   - UDP Advanced: backup + basic DR
+   - UDP Premium: adds replication, HA, virtual standby
+   - UDP Premium Plus: adds Arcserve Cloud, global dedup
+
+2. Arcserve SaaS Backup (Cloud-to-Cloud)
+   - Backup for Microsoft 365: Exchange, SharePoint, OneDrive, Teams
+   - Backup for Google Workspace: Gmail, Drive, Contacts, Calendar
+   - Backup for Salesforce
+   - Retention: configurable (1 year to unlimited)
+   - Restore: per-item or bulk to original or alternate location
+
+3. Arcserve Backup (Traditional Tape/Disk Backup)
+   - Legacy product for tape library environments
+   - Supports LTO tape, virtual tape libraries (VTL)
+   - Suitable for compliance environments requiring tape offsite
+
+4. Arcserve Business Continuity Cloud (BCC)
+   - Fully managed DRaaS (Disaster Recovery as a Service)
+   - Fail over physical/virtual servers to Arcserve Cloud
+   - RTO: minutes; RPO: as low as 15 minutes
+   - Runbook automation for orchestrated failover
+
+5. Arcserve StorageCraft OneXafe (Immutable Appliance)
+   - Hardware appliance with built-in immutable snapshots
+   - Scale-out NAS with ransomware-resilient storage
+   - Cannot be encrypted by ransomware (immutable snapshots every 90 seconds)
+   - Capacity: 32 TB to 2 PB per cluster
+
+KEY FEATURES
+============
+- Ransomware protection: immutable backup copies + honeypot detection
+- Instant VM recovery: restore to VMware/Hyper-V in <15 minutes
+- Heartbeat monitoring: verify backup health continuously
+- Global source-side deduplication: reduce backup storage by up to 80%
+- Encryption: AES-256 for data at rest and in transit
+- Compliance: GDPR, PDPA, HIPAA — retention lock on backup data
+- Central console: manage all agents from single web UI
+
+TECHNICAL REQUIREMENTS
+======================
+- UDP Console server: Windows Server 2016+, 8 GB RAM, 100 GB storage
+- Agent: Windows Server 2008 R2+, Windows 7+, RHEL/CentOS/Ubuntu LTS
+- VMware: vSphere 6.0–8.0 (agentless via VADP)
+- Hyper-V: 2012 R2+
+- Network: agent communicates on TCP 8014-8016 to console
+
+LICENSING
+=========
+- Per-socket or per-VM subscription (annual)
+- SaaS Backup: per-user per-month
+- OneXafe appliance: hardware purchase + annual software subscription
+- Support tiers: Standard (8x5) or Premium (24x7)
+
+SIZING GUIDE
+============
+- Small (5-20 servers / 50-200 VMs)     : UDP Advanced, single console
+- Medium (20-100 servers / 200-500 VMs) : UDP Premium, with dedup store
+- Large (100+ servers / 500+ VMs)       : UDP Premium Plus, with replication
+- Microsoft 365 backup                   : SaaS Backup (per user/month)
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Replace legacy backup solution with modern image-based backup
+- Ransomware recovery: immutable backup ensures clean restore after attack
+- Microsoft 365 backup (Exchange + SharePoint + Teams)
+- DR to cloud: fail over to Arcserve Cloud or AWS/Azure
+- Compliance: retain backup data with immutable WORM storage
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- Arcserve + Sophos Intercept X: endpoint protection prevents ransomware, Arcserve ensures recovery
+- Arcserve + Varonis: Varonis detects ransomware activity, Arcserve provides clean restore point
+- Arcserve + LogPoint: backup job events fed into SIEM for monitoring
+- Arcserve + SuperMicro: Arcserve software on SuperMicro backup server hardware

@@ -1,0 +1,103 @@
+LOGPOINT — Product Spec Sheet
+Website: https://www.vrcomm.net/product-detail?id=107
+Vendor site: https://www.logpoint.com/
+Category: SIEM (Security Information & Event Management), SOAR, UEBA
+
+PRODUCT OVERVIEW
+================
+LogPoint is a SIEM platform with built-in SOAR and UEBA capabilities.
+It collects, normalises, and correlates security logs from across the IT environment
+to detect threats, support compliance, and enable rapid incident response.
+
+PRODUCT COMPONENTS
+==================
+
+1. LogPoint SIEM (Core)
+   - Log collection from 700+ integrated data sources (network, endpoint, cloud, applications)
+   - Real-time normalization and correlation
+   - Threat detection using 3,000+ out-of-the-box correlation rules
+   - MITRE ATT&CK framework mapping for each alert
+   - Dashboards: SOC dashboards, compliance dashboards, executive reports
+   - Search: SQL-like query language (LogPoint Query Language — LPQL)
+   - Retention: configurable (6 months to multi-year on-prem or cloud)
+
+2. LogPoint SOAR (Security Orchestration, Automation & Response)
+   - Playbook automation for common incident response workflows
+   - 200+ pre-built integrations (EDR, firewall, ticketing, email, chat)
+   - Auto-enrich alerts with threat intelligence
+   - Auto-block IP on firewall via playbook
+   - Escalation to ticketing systems (Jira, ServiceNow)
+   - No-code playbook builder
+
+3. LogPoint UEBA (User & Entity Behavior Analytics)
+   - Baseline normal behavior per user and device
+   - Detect insider threats, compromised accounts, privilege escalation
+   - Risk scoring per user/entity (aggregates across multiple events)
+   - Integrated with SIEM — UEBA risk events appear alongside SIEM alerts
+
+4. LogPoint Business Application Security (BAS)
+   - Out-of-the-box monitoring for SAP, Microsoft 365, Active Directory
+   - Detects fraud, access violations, and configuration changes in business apps
+   - GDPR / compliance reporting for SAP audit trails
+
+5. Converged SIEM (newest offering)
+   - Combines SIEM + SOAR + UEBA in single unified platform
+   - Cloud-native deployment option
+   - Agent-based log collection: LogPoint Agent (Windows/Linux)
+   - Agentless: Syslog, API, WMI, database connectors
+
+DATA SOURCES (key integrations)
+================================
+- Network: Hillstone Networks, Sangfor, Sophos Firewall (all VRCOMM partners), switches, routers
+- Endpoint: Sophos Intercept X, Trellix, Windows Event Logs, Linux syslog
+- Identity: Active Directory, Azure AD, RADIUS
+- Email: Microsoft 365, Exchange, Gmail
+- Cloud: AWS CloudTrail, Azure Monitor, GCP Audit Logs
+- Databases: Oracle, MSSQL, MySQL
+- Applications: SAP, Salesforce, custom applications via API
+
+TECHNICAL REQUIREMENTS
+======================
+- Deployment: on-premise (Linux — CentOS/RHEL recommended) or SaaS (LogPoint Cloud)
+- Hardware minimum (on-prem):
+  - Small (up to 5,000 events/sec EPS): 8 CPU, 32 GB RAM, 2 TB SSD storage
+  - Medium (5,000-20,000 EPS): 16 CPU, 64 GB RAM, 10 TB storage
+  - Large (20,000+ EPS): cluster deployment
+- LogPoint Agent: Windows 7+, Windows Server 2008+, major Linux distributions
+- High Availability: master-replica cluster
+
+LICENSING
+=========
+- Per-device per-day or per-EPS (events per second) subscription
+- On-premise: perpetual license + annual maintenance OR subscription
+- SaaS: annual subscription per GB ingested per day
+- LogPoint SOAR: separate module license (per playbook execution or flat fee)
+- UEBA: add-on to core SIEM license
+
+SIZING GUIDE
+============
+- 50-200 devices (typical SMB): ~1,000-5,000 EPS, small appliance
+- 200-1,000 devices (mid-enterprise): ~5,000-20,000 EPS, medium deployment
+- 1,000+ devices (large enterprise): cluster / cloud deployment
+
+COMPLIANCE REPORTING
+====================
+- Pre-built compliance packs: ISO 27001, PDPA, PCI-DSS, GDPR, HIPAA, NIST
+- Automated report scheduling (daily/weekly/monthly)
+- Evidence collection for auditors
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Central log collection from all security devices (firewall, endpoint, AD)
+- SOC alerting and incident investigation
+- PDPA compliance — evidence that personal data access is monitored and audited
+- Insider threat detection via UEBA
+- Automated response to common attacks (block IP, disable account) via SOAR playbooks
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- LogPoint + Hillstone/Sangfor/Sophos: ingest firewall logs for network threat detection
+- LogPoint + Varonis: correlate data access anomalies with network events
+- LogPoint + Wallix: ingest PAM session events for privileged user activity monitoring
+- LogPoint + Trellix: endpoint detection events from Trellix feed into LogPoint SIEM
+- LogPoint + Safetica: DLP incidents from Safetica correlate with user behavior in LogPoint

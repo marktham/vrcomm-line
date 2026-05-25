@@ -1,0 +1,102 @@
+TRELLIX — Product Spec Sheet
+Website: https://www.trellix.com/
+Category: XDR (Extended Detection & Response), EDR, Email Security, Network Security, SIEM
+
+PRODUCT OVERVIEW
+================
+Trellix is the combined entity of FireEye and McAfee Enterprise (merged 2022).
+It provides an XDR (Extended Detection & Response) platform with best-of-breed detection
+from both the FireEye (advanced threat intelligence) and McAfee (endpoint, network, SIEM) heritages.
+
+PRODUCT PLATFORM: TRELLIX XDR
+==============================
+
+1. Trellix Endpoint Security (ENS / HX)
+   - Trellix ENS (Endpoint Security): next-gen EPP — anti-malware, exploit prevention, firewall, web control
+   - Trellix HX (Endpoint Detection & Response): EDR with forensic investigation, threat hunting
+   - Indicator of Attack (IoA) detection: behavioral-based, detects fileless attacks
+   - FireEye heritage: Mandiant threat intel built into detection
+   - Platforms: Windows, macOS, Linux, Android, iOS
+   - Management: Trellix ePO (ePolicy Orchestrator) — on-prem or SaaS
+
+2. Trellix Network Security (NX / PX)
+   - Trellix NX (Network Security): inline or out-of-band network threat detection
+   - Advanced sandbox (Multi-Vector Virtual Execution — MVX): detonate suspicious files/URLs
+   - Zero-day detection: detect threats that bypass signature-based detection
+   - Trellix PX (Packet Capture): integrated PCAP for network forensics
+   - Models: NX 900, NX 1500, NX 2400, NX 4500 (by throughput: 100 Mbps to 4 Gbps)
+
+3. Trellix Email Security (EX / Cloud)
+   - Inbound: anti-phishing, anti-spam, attachment sandboxing, URL rewriting
+   - Outbound: DLP for email, S/MIME encryption support
+   - Cloud: Trellix Cloud Email Security for Microsoft 365 and Google Workspace
+   - On-premise: Trellix EX appliance for on-prem mail servers
+
+4. Trellix Helix (SIEM / SOAR / XDR Platform)
+   - Cloud-native SIEM with built-in SOAR
+   - Ingest from Trellix Endpoint + Network + Email + 3rd party sources
+   - Threat intelligence: Trellix Intelligence Exchange (TIE) + Mandiant Advantage feeds
+   - Automated playbooks for incident response
+   - MITRE ATT&CK aligned detection rules
+
+5. Trellix Data Security (formerly McAfee DLP)
+   - DLP for endpoint, network, and cloud
+   - Discovery: classify sensitive data across file shares, endpoints, cloud storage
+   - Enforcement: block data leaving via email, USB, upload, clipboard
+
+6. Trellix Intelligence Exchange (TIE) + Data Exchange Layer (DXL)
+   - Shares threat intel in real-time between all Trellix products
+   - DXL: message bus enabling products to communicate (file reputation, IP reputation)
+   - Open DXL: third-party tools can publish/subscribe threat intel
+
+KEY FEATURES
+============
+- MVX Sandbox: patented zero-day detection — run suspicious objects in virtual environment
+- Mandiant Threat Intelligence: built-in, regularly updated from active incident response
+- Detection-as-a-Service: cloud-detonation for low-latency zero-day verdict
+- ePO integration: single management for all endpoint security policies
+- MITRE ATT&CK coverage: comprehensive mapping across all product detections
+
+TECHNICAL REQUIREMENTS
+======================
+- ENS Agent: Windows 7+, Windows Server 2012+, macOS 10.14+, RHEL/CentOS/Ubuntu
+- ePO (management): Windows Server 2016+, SQL Server, 16 GB RAM, 200 GB storage
+- NX appliance: physical or virtual (ESXi), requires mirror port or TAP for traffic feed
+- Helix SIEM: cloud SaaS (no on-premise server)
+
+LICENSING
+=========
+- ENS: per endpoint per year subscription
+- HX (EDR): per endpoint per year (add-on to ENS)
+- NX: hardware appliance + annual subscription
+- Helix: per GB ingested per day
+- Email Security: per user per year
+
+SIZING GUIDE (ENDPOINT)
+========================
+- Up to 500 endpoints   : ePO virtual appliance, standard sizing
+- 500-5,000 endpoints   : dedicated ePO server + SQL Server
+- 5,000+ endpoints      : distributed ePO with multiple handlers
+
+SIZING GUIDE (NETWORK NX)
+==========================
+- Up to 200 Mbps       : NX 900
+- 200-500 Mbps         : NX 1500
+- 500 Mbps - 1 Gbps    : NX 2400
+- 1-4 Gbps             : NX 4500
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Advanced threat detection that standard AV misses (zero-day, APT)
+- Email sandboxing: detonate malicious attachments before delivery
+- EDR investigation: trace full attack chain after detection
+- SIEM (Helix) with Mandiant threat intel for SOC operations
+- DLP combined with EDR for insider threat use case
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- Trellix + LogPoint: Trellix detection events forwarded to LogPoint SIEM for correlation
+- Trellix + Niagara Networks: Niagara feeds network traffic to Trellix NX
+- Trellix + Cyfirma: Cyfirma provides external threat intel context for Trellix investigations
+- Trellix + Varonis: Trellix detects malware on endpoint, Varonis confirms data access impact
+- Trellix + Sophos: organisations migrating from Trellix/McAfee to Sophos (VRCOMM handles both)

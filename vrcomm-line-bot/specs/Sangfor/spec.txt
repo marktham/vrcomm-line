@@ -1,0 +1,87 @@
+SANGFOR — Product Spec Sheet
+Website: https://www.sangfor.com/
+Category: NGFW, SD-WAN, Endpoint Security, HCI, SSL VPN, Cloud
+
+PRODUCT FAMILIES
+================
+
+1. NGFW (Next-Generation Firewall) — Network Access Firewall Series
+   - IAG (Internet Access Gateway) + NGAF (Next-Gen Application Firewall) combined
+   - M5100-F : 1 Gbps NGFW, up to 200 concurrent users, SMB
+   - M5200-F : 2 Gbps NGFW, up to 500 users, mid-market
+   - M5400-F : 4 Gbps NGFW, up to 1,000 users
+   - M5800-F : 8 Gbps NGFW, large enterprise / campus
+   - M5000-F-S : Software appliance / VM deployment
+   Features: App control, URL filter, IPS, AV, bandwidth management, user authentication (AD/LDAP), SSL inspection, DDoS protection, Botnet C&C blocking
+
+2. SD-WAN
+   - Integrated into NGFW series (overlay on same hardware)
+   - Supports MPLS + Broadband + 4G/5G link bonding
+   - Zero-touch provisioning (ZTP) for branch deployment
+   - Application-aware routing, QoS per application
+   - Centrally managed via Sangfor HCI/Cloud Management
+
+3. Endpoint Secure (EDR/EPP)
+   - Next-gen endpoint protection: anti-ransomware, behavioral detection
+   - EDR: threat hunting, process tree visualization, forensic timeline
+   - Supports Windows 7/10/11, Windows Server 2012+
+   - Management: on-prem server or SaaS console
+   - Micro-isolation: control lateral movement between endpoints
+   - Integration with NGFW for automated threat response
+
+4. SSL VPN / Remote Access (EasyConnect)
+   - EasyConnect client (Windows/macOS/iOS/Android)
+   - Per-user/group access policy
+   - Two-factor authentication (SMS OTP, TOTP)
+   - Web portal for clientless access
+   - Appliance: VPN-1000, VPN-2000, VPN-5000 (based on concurrent users)
+     VPN-1000: up to 100 concurrent SSL VPN sessions
+     VPN-2000: up to 300 concurrent sessions
+     VPN-5000: up to 1,000 concurrent sessions
+
+5. HCI (Hyper-Converged Infrastructure)
+   - aCloud HCI: compute + storage + virtualization on x86 nodes
+   - Minimum 3-node cluster, scales to 32 nodes
+   - Built-in Sangfor Virtual SAN (vSAN)
+   - Hypervisor: Sangfor aSV (KVM-based)
+   - Use cases: VDI, private cloud, DR site
+   - Storage tiers: SSD + HDD with data tiering
+
+6. IAM (Identity & Access Management)
+   - User behavior analytics
+   - Integration with AD, LDAP, RADIUS
+   - Single Sign-On (SSO) for web apps
+   - Risk-based adaptive authentication
+
+KEY FEATURES (NGFW)
+====================
+- 6,000+ application signatures
+- 200+ million URL categories (cloud-based)
+- AI-powered malware detection (cloud sandbox)
+- Automatic blocking of ransomware communication
+- Built-in SD-WAN (no additional license required on M series)
+- HA: Active-Active and Active-Passive
+- IPv4/IPv6 dual stack
+
+SIZING GUIDE
+============
+- 50-100 users (small office) : M5100-F
+- 100-300 users               : M5100-F / M5200-F
+- 300-800 users               : M5200-F / M5400-F
+- 800-2,000 users (HQ)        : M5400-F / M5800-F
+- Remote access 50-100 VPN    : VPN-1000
+- Remote access 100-300 VPN   : VPN-2000
+
+LICENSING
+=========
+- Base: Firewall + Routing + VPN + Basic IPS (included in hardware)
+- Security subscription (annual): Advanced IPS + AV + URL + App + Cloud Sandbox + Anti-Ransomware
+- Support: 1-year or 3-year (onsite or NBD)
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+=====================================
+- Full security stack in one appliance (NGFW + VPN + SD-WAN + bandwidth mgmt)
+- Endpoint protection for Windows environments
+- SSL VPN for remote workforce (EasyConnect)
+- Branch connectivity over SD-WAN replacing MPLS
+- HCI for private cloud / VDI at customer datacenter

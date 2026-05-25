@@ -1,0 +1,93 @@
+ENTRUST — Product Spec Sheet
+Website: https://www.entrust.com/
+Category: PKI, Digital Certificates, Identity & Access, HSM, Document Security
+
+PRODUCT OVERVIEW
+================
+Entrust is a global identity and security company providing PKI infrastructure,
+digital certificates, hardware security modules (HSM), and identity verification solutions.
+Trusted by governments and enterprises for high-assurance authentication and encryption.
+
+PRODUCT FAMILIES
+================
+
+1. Entrust Certificate Services (Public SSL/TLS Certificates)
+   - OV SSL (Organisation Validated): standard HTTPS certificates
+   - EV SSL (Extended Validation): green bar / full org verification
+   - Wildcard SSL: *.domain.com covers all subdomains
+   - Multi-SAN / UCC: multiple domains in one certificate
+   - Code Signing certificates: for software publisher identity
+   - S/MIME: email encryption and digital signature certificates
+   - IoT Device certificates: for device authentication
+   Validity: 1 year (DV/OV/EV), up to 3 years for some types
+
+2. Entrust PKI as a Service (PKIaaS) / Managed PKI
+   - Hosted Private Certificate Authority (CA) managed by Entrust
+   - Issue internal certificates for: servers, devices, users, VPN, 802.1X
+   - Microsoft ADCS replacement or complement
+   - SCEP, EST, ACME protocol support for automated enrollment
+   - Certificate Lifecycle Management portal (web UI + API)
+   - Integrates with AppviewX, Venafi for CLM orchestration
+
+3. Entrust nShield HSM (Hardware Security Module)
+   - Physical tamper-resistant device for cryptographic key storage
+   - Models:
+     - nShield Solo XC: PCIe card for single server
+     - nShield Connect XC: network-attached HSM (1U appliance)
+     - nShield Edge: USB HSM for portable/dev use
+   - Performance: up to 20,000 RSA-2048 ops/sec (Connect XC high-perf)
+   - FIPS 140-2 Level 2 and 3 certified
+   - Common Criteria EAL4+ certified
+   - Use cases: PKI root CA key storage, database encryption, code signing, TLS acceleration
+   - Supports: Microsoft ADCS, OpenSSL, Java JCE, PKCS#11
+
+4. Entrust Identity (IAM / MFA)
+   - Entrust Identity as a Service (IDaaS): cloud MFA and SSO
+   - Authenticators: push notification, OTP, smart card, FIDO2
+   - Adaptive MFA: risk-based step-up authentication
+   - Passwordless authentication support
+   - Integration with Active Directory, Azure AD, LDAP
+   - Smart card + PIV credential management
+
+5. Entrust Document Security
+   - High-security printing for ID cards, passports, banknotes
+   - Digital document signing and verification
+   - Primarily for government/national ID programs
+
+KEY FEATURES (HSM)
+==================
+- PKCS#11 and Microsoft CNG/CSP API support
+- Remote administration (no local access required for management)
+- Key ceremony support: secure key generation ceremonies with audit witnesses
+- Key backup and recovery: encrypted key archive
+- High availability: active-active HSM cluster
+
+TECHNICAL REQUIREMENTS
+======================
+- nShield Connect: 1U rack mount, 1 GbE management interface
+- nShield Solo: PCIe x4 slot in server
+- Client software (Security World): Windows Server, RHEL/CentOS, Ubuntu
+- Network HSM: UDP 9004 for HSM communication
+
+LICENSING
+=========
+- SSL certificates: per certificate per year (OV/EV/Wildcard)
+- PKIaaS: per-certificate-issued or flat annual subscription
+- nShield HSM: hardware purchase + annual CodeSafe/Support subscription
+- Identity/MFA: per-user per-year subscription
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Government/enterprise root CA with HSM-backed keys (nShield)
+- SSL certificate management for large web server farms
+- PKI for device authentication in 802.1X NAC deployments
+- MFA for privileged access and VPN authentication
+- Code signing for software distributed to customers
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- Entrust HSM + AppviewX: AppviewX manages certificate lifecycle, Entrust HSM protects CA keys
+- Entrust PKI + InfoExpress NAC: issue device certs from Entrust PKI, InfoExpress checks cert for 802.1X
+- Entrust + Wallix: use Entrust PKI-issued smart card certs for Wallix PAM authentication
+- Entrust + Sectigo: Entrust for private/internal PKI, Sectigo for public-facing SSL certificates
+- Entrust HSM + Sangfor/Hillstone: HSM-backed VPN certificates for higher-assurance IPSec

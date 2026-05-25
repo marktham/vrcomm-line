@@ -1,0 +1,99 @@
+BACKBOX — Product Spec Sheet
+Website: https://backbox.com/
+Category: Network Automation, Configuration Backup & Restore, Compliance Automation
+
+PRODUCT OVERVIEW
+================
+BackBox is a Network Automation Platform focused on network device configuration backup,
+restore, change management, and compliance auditing for multi-vendor network environments.
+It automates repetitive network operations and reduces human error in network changes.
+
+PRODUCT MODULES
+===============
+
+1. Configuration Backup & Restore (Core)
+   - Automated scheduled backup of network device configurations
+   - Supports 180+ device types: routers, switches, firewalls, load balancers, wireless controllers
+   - Versioned backups: full history with diff comparison between versions
+   - Instant restore: push previous config back to device in one click
+   - Backup storage: local, NFS, SAN, S3-compatible
+   - Integrity check: verify backup completeness after each run
+   Supported vendors: Cisco, Hillstone Networks, Sangfor, Sophos, A10 Networks, Juniper, Palo Alto, F5, and 170+ others
+
+2. Network Change Automation
+   - Script-based automation for repetitive tasks: VLAN add/remove, ACL updates, firmware upgrades
+   - Task scheduler: run automation jobs on schedule or on-demand
+   - Pre/post verification: check device state before and after change
+   - Rollback trigger: auto-restore previous config if verification fails
+   - Python and Expect scripting support
+
+3. Compliance Auditing
+   - Policy-based configuration compliance checks
+   - Pre-built compliance templates: CIS Benchmarks, PCI-DSS, ISO 27001, NIST
+   - Custom rules: define your own configuration standards
+   - Compliance score per device and per network zone
+   - Auto-remediation: push compliant config if violation detected
+   - Reports: scheduled compliance reports for auditors
+
+4. Vulnerability & Firmware Management
+   - Track firmware versions across all devices
+   - Compare current firmware against vendor security advisories
+   - Automate firmware upgrade scheduling with backup-before-upgrade workflow
+
+5. BackBox Insights (Analytics)
+   - Dashboard: network-wide health, compliance score, backup success rate
+   - Change history: who changed what, when, from which console
+   - Audit trail for change management and ITSM integration
+
+KEY FEATURES
+============
+- Multi-vendor support: 180+ network device types in single platform
+- Agentless: connects via SSH, Telnet, SNMP, API — no agent on network devices
+- Encryption: backup files encrypted at rest (AES-256)
+- RBAC: granular permissions per device group or network zone
+- Ticketing integration: ServiceNow, Jira for change management workflow
+- REST API: integrate with Ansible, Terraform, ITSM tools
+
+TECHNICAL REQUIREMENTS
+======================
+- BackBox Server: Linux (CentOS/RHEL/Ubuntu), VM or physical
+  Minimum: 4 CPU, 8 GB RAM, 200 GB storage (more for large networks)
+- Database: MySQL/MariaDB (bundled)
+- Network access: SSH/Telnet/SNMP from BackBox server to managed devices
+- Supported in VMware, KVM, Hyper-V, or bare metal
+
+LICENSING
+=========
+- Per managed device per year subscription
+- Tiers: Essentials (backup only), Professional (backup + automation), Enterprise (all modules)
+- Typical starting point: 50-device minimum
+- Perpetual license option available for larger deployments
+
+SIZING GUIDE
+============
+- Up to 100 devices    : Standard VM (4 CPU, 16 GB RAM)
+- 100-500 devices      : Medium VM (8 CPU, 32 GB RAM)
+- 500-2,000 devices    : Large VM or physical server, external DB
+- 2,000+ devices       : Distributed deployment with remote collectors
+
+COMPLIANCE FRAMEWORKS SUPPORTED
+================================
+- PCI-DSS: network device hardening requirements
+- ISO 27001: A.12.1.2 Change management, A.12.4.1 Event logging
+- CIS Benchmarks: for IOS, NX-OS, JunOS, ASA, and others
+- Custom: define company-specific configuration standards
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Protect against configuration loss: auto-backup after every change
+- Disaster recovery: restore network configuration after hardware failure
+- Compliance audit: prove network devices meet security baseline
+- Multi-vendor management: single tool for Hillstone + Sangfor + Sophos + A10 + switches
+- Change management: automate and audit all network configuration changes
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- BackBox + Hillstone/Sangfor/Sophos: back up all NGFW configs in one place
+- BackBox + A10 Networks: back up ADC configs, restore quickly after failure
+- BackBox + LogPoint: SIEM ingests BackBox audit logs for change management monitoring
+- BackBox + Wallix: Wallix controls who can access network devices, BackBox records what they changed

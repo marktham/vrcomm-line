@@ -1,0 +1,89 @@
+SECTIGO — Product Spec Sheet
+Website: https://www.sectigo.com/
+Category: SSL/TLS Certificates, Public PKI, S/MIME, Code Signing, Certificate Manager
+
+PRODUCT OVERVIEW
+================
+Sectigo (formerly Comodo CA) is one of the world's largest commercial Certificate Authorities (CA).
+It provides public SSL/TLS certificates, S/MIME email certificates, code signing certificates,
+and a certificate lifecycle management platform (Sectigo Certificate Manager — SCM).
+
+CERTIFICATE PRODUCTS
+====================
+
+1. SSL/TLS Certificates (Web Server)
+   - DV (Domain Validated): issued in minutes, for basic HTTPS
+   - OV (Organisation Validated): verified company identity, 1-3 days issuance
+   - EV (Extended Validation): highest trust, full org verification, 1-5 days
+   - Wildcard SSL: *.domain.com (covers unlimited subdomains)
+   - Multi-Domain SAN: up to 250 domains in one certificate
+   - Wildcard Multi-Domain: combine wildcard + multi-domain
+   Validity: 1 year maximum (per CA/B Forum baseline requirements)
+   Standards: RSA 2048/4096, ECDSA P-256/P-384
+
+2. S/MIME Certificates (Email Security)
+   - Personal Authentication: email encryption + digital signature
+   - Enterprise: issued via directory (AD/LDAP) integration
+   - Supports: Outlook, Apple Mail, Thunderbird
+   - Use case: secure internal communications, PDPA-compliant email handling
+
+3. Code Signing Certificates
+   - Standard OV Code Signing: for software publisher verification
+   - EV Code Signing: highest trust, hardware token required, instant SmartScreen bypass on Windows
+   - Platforms: Windows (Authenticode), Java JAR, macOS app, Android, kernel driver signing
+
+4. Document Signing
+   - PDF signing certificates for Adobe Acrobat Reader verified signatures
+   - PAdES compliant for EU eIDAS
+
+5. IoT & Device Certificates
+   - Private PKI for IoT device identity
+   - SCEP/EST protocol support for automated enrollment
+   - High-volume issuance for device manufacturing
+
+6. Sectigo Certificate Manager (SCM)
+   - Centralised management portal for all Sectigo certificates
+   - Auto-enrolment via ACME protocol (Let's Encrypt compatible)
+   - Discovery: scan network for all TLS certificates (Sectigo + competitor CA)
+   - Alerts: expiry notifications at configurable intervals
+   - Integrations: AppviewX, Venafi, HashiCorp Vault, ServiceNow
+   - ACME client support for Apache, Nginx, IIS, HAProxy auto-renewal
+
+KEY FEATURES
+============
+- Browser trust: certificates trusted by Chrome, Firefox, Safari, Edge, iOS, Android
+- SAN support: multiple domains in one certificate (cost-efficient for large deployments)
+- Reissuance: unlimited free reissuance during validity period
+- Multi-year subscription: pay for 3-5 years, get auto-renewed 1-year certs
+- API: RESTful API for automated certificate ordering and management
+- Root store: Sectigo root in all major browsers + operating systems
+
+PRICING TIERS (APPROXIMATE CATEGORIES)
+========================================
+- DV SSL: most affordable, basic domain validation
+- OV SSL: mid-range, organisation identity
+- EV SSL: premium, full vetting
+- Wildcard: higher than single-domain, covers unlimited subdomains
+- Volume discounts available for enterprise accounts
+(Exact pricing: ให้ Sales ดึง cost sheet แล้วทำ quote ได้เลยครับ)
+
+TECHNICAL REQUIREMENTS (SCM)
+=============================
+- SCM: cloud-based SaaS (no on-premise installation)
+- ACME client: certbot, win-acme, or any RFC 8555-compliant ACME client
+- Discovery agent: lightweight scanner for certificate inventory
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Public-facing website SSL certificates (OV/EV for banking, e-commerce, government)
+- Large-scale SSL management via SCM (100+ certificates)
+- S/MIME for secure executive email communications
+- EV Code Signing for software companies distributing to enterprise customers
+- ACME auto-renewal to prevent certificate expiry outages
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- Sectigo + AppviewX: AppviewX as CLM front-end, Sectigo as public CA for issuance
+- Sectigo + Entrust: Sectigo for public SSL, Entrust for private PKI / HSM-backed roots
+- Sectigo + A10 Networks: deploy Sectigo certs on A10 ADC, manage lifecycle via SCM
+- Sectigo + LogPoint: certificate expiry events and SCM audit logs forwarded to SIEM

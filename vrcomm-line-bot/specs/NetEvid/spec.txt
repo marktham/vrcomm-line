@@ -1,0 +1,90 @@
+NETEVID — Product Spec Sheet
+Website: https://netevid.com/
+Category: Network Forensics, Full Packet Capture, Network Detection & Response (NDR)
+
+PRODUCT OVERVIEW
+================
+NetEvid is a Network Forensics and Full Packet Capture (FPC) platform that records
+all network traffic for retrospective investigation, incident response, and legal evidence.
+It enables security teams to reconstruct exactly what happened during a security incident
+at the packet level — the "security camera" for network traffic.
+
+CORE CAPABILITIES
+=================
+
+1. Full Packet Capture (FPC)
+   - Captures 100% of network traffic at line rate (no packet drops)
+   - Storage: indexed packet database for fast search and retrieval
+   - Retention: configurable (days to months depending on storage capacity)
+   - Capture sources: network TAP, SPAN/mirror port, inline
+   - Supported speeds: 1 Gbps, 10 Gbps, 40 Gbps (hardware dependent)
+
+2. Network Forensics & Investigation
+   - Retrospective search: find all traffic involving a specific IP, port, protocol, or payload string
+   - Session reconstruction: rebuild TCP sessions, HTTP conversations, file transfers
+   - File extraction: recover files transferred over HTTP, FTP, SMB, email
+   - Credential visibility: detect cleartext authentication attempts
+   - PCAP export: export filtered packets as standard PCAP for Wireshark analysis
+   - Timeline view: correlate events across multiple sessions
+
+3. Network Detection & Response (NDR)
+   - Behavioral analytics: detect anomalous traffic patterns
+   - Protocol anomaly detection: non-standard use of HTTP, DNS, SMTP
+   - Data exfiltration detection: large outbound transfers, DNS tunneling, base64 in DNS
+   - Command & Control (C2) detection: beaconing patterns, Tor exit nodes
+   - Lateral movement detection: unusual internal scanning, SMB spread
+   - Alerts: real-time with MITRE ATT&CK tagging
+
+4. Threat Hunting
+   - Query interface: search packet database with keyword, IP, hash, protocol filters
+   - Historical investigation: go back weeks/months to investigate past events
+   - Evidence preservation: cryptographic hash (SHA-256) of captured evidence for legal chain of custody
+   - Report generation: incident timeline reports for CISO and legal teams
+
+KEY FEATURES
+============
+- Zero packet loss at rated capture speeds
+- Encrypted traffic analysis (without decryption): metadata-based detection of C2 in HTTPS/TLS
+- DPI (Deep Packet Inspection): classify application even on non-standard ports
+- Out-of-band deployment: no impact on production network performance
+- API: REST API for SIEM integration (send alerts/metadata to LogPoint, Splunk)
+- Chain of custody: evidence integrity for legal proceedings
+
+TECHNICAL REQUIREMENTS
+======================
+- NetEvid Appliance: dedicated hardware (customised server with high-speed NIC and storage)
+  or VM with high-performance NIC passthrough
+- Storage: SSD for index + large HDD/NAS for packet storage
+  Rule of thumb: 1 Gbps network → ~100-400 GB/day raw capture
+  1 week retention at 1 Gbps avg utilisation: ~1-3 TB
+- Network TAP or SPAN port required for traffic access
+- Management: web-based GUI + REST API
+
+LICENSING
+=========
+- Appliance-based license per capture speed tier
+- Subscription: annual software + support
+- Storage: customer provides (SAN, NAS, or internal disks)
+
+SIZING GUIDE
+============
+- 100 Mbps average traffic  : 1 Gbps capture appliance, ~500 GB/week storage
+- 500 Mbps average traffic  : 1 Gbps or 10 Gbps appliance, ~2-3 TB/week storage
+- 1 Gbps average traffic    : 10 Gbps appliance, ~5-7 TB/week storage
+- Note: compression typically achieves 3-5x reduction on text-heavy traffic
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Post-incident forensics: replay traffic from before/during a breach
+- Ransomware investigation: trace initial infection vector and lateral movement path
+- Legal evidence: court-admissible packet capture with chain of custody
+- SOC investigation: tier-2 analysts investigate alerts from SIEM with full packet context
+- Data exfiltration detection and proof: capture exact data that was stolen
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- NetEvid + LogPoint SIEM: SIEM provides alert, NetEvid provides packet-level evidence
+- NetEvid + Niagara Networks: Niagara aggregates/distributes traffic to NetEvid capture points
+- NetEvid + Hillstone iSource: NDR correlation between Hillstone flow data and NetEvid packets
+- NetEvid + Varonis: Varonis detects data access anomaly, NetEvid confirms data actually left the network
+- NetEvid + Cyfirma: Cyfirma identifies C2 IPs, NetEvid captures evidence of communication to those IPs

@@ -1,0 +1,90 @@
+SOPHOS — Product Spec Sheet
+Website: https://www.sophos.com/
+Category: Endpoint Security, Firewall, Email Security, MDR
+
+PRODUCT FAMILIES
+================
+
+1. Sophos Firewall (XGS Series) — Hardware NGFW
+   - XGS 87  : 3.1 Gbps FW, 1.0 Gbps NGFW, home/SOHO (<20 users)
+   - XGS 107 : 4.2 Gbps FW, 1.5 Gbps NGFW, small office (20-50 users)
+   - XGS 116 : 5.6 Gbps FW, 1.9 Gbps NGFW, small office (30-75 users)
+   - XGS 126 : 8.6 Gbps FW, 2.8 Gbps NGFW, SMB (50-150 users)
+   - XGS 136 : 11 Gbps FW, 3.7 Gbps NGFW, SMB-Mid (100-200 users)
+   - XGS 2100: 23 Gbps FW, 7.4 Gbps NGFW, mid-enterprise (200-500 users)
+   - XGS 2300: 31 Gbps FW, 10 Gbps NGFW (300-700 users)
+   - XGS 3100: 52 Gbps FW, 16 Gbps NGFW, large enterprise
+   - XGS 3300: 72 Gbps FW, 22 Gbps NGFW
+   - XGS 4300: 110 Gbps FW, 33 Gbps NGFW, data center
+   - XGS 4500: 135 Gbps FW, 40 Gbps NGFW
+   Key features: Synchronized Security with Sophos Endpoint, Xstream TLS inspection, SD-WAN, Zero-Day protection, Active Threat Response
+
+2. Sophos Intercept X — Endpoint Protection (EPP + EDR)
+   - Intercept X (EPP tier): anti-exploit, anti-ransomware, deep learning AI
+   - Intercept X Advanced (EDR): root cause analysis, threat hunting, MDR ready
+   - Intercept X Advanced with XDR: cross-product telemetry (firewall, email, cloud)
+   - Server protection: Intercept X for Server
+   - Mobile: Sophos Mobile (MDM + security)
+   Platforms: Windows 7+, Windows Server 2012+, macOS 10.15+, Linux (RHEL/CentOS/Ubuntu)
+
+3. Sophos Email Security
+   - Cloud-based email security gateway
+   - Anti-phishing, impersonation protection
+   - Sandboxing for attachments
+   - Time-of-click URL protection
+   - DLP for outbound email
+   - Encryption for sensitive emails
+   Compatible with Microsoft 365, Google Workspace, on-premise Exchange
+
+4. Sophos MDR (Managed Detection & Response)
+   - 24/7 threat hunting and incident response by Sophos experts
+   - Tier 1: MDR Essentials — alerting + triage
+   - Tier 2: MDR Complete — full incident response + adversary removal
+   - Integrates with Sophos XDR data lake
+   - SLA: 99.99% uptime, mean time to respond <60 minutes
+
+5. Sophos ZTNA (Zero Trust Network Access)
+   - Replaces VPN for application access
+   - Agent-based (Sophos ZTNA gateway)
+   - Identity-aware, device posture checking
+   - Integrates with Sophos Central + Intercept X
+
+6. Sophos Central — Management Platform
+   - Single cloud console for all Sophos products
+   - Sophos Central: manage endpoint + firewall + email + mobile
+   - API-based integration with SIEM/SOAR
+   - Role-based access control
+
+SOPHOS SYNCHRONIZED SECURITY
+==============================
+- Firewall + Endpoint communicate via Security Heartbeat
+- Compromised endpoint → Firewall auto-isolates it within seconds
+- Requires both Sophos Firewall (XGS) + Sophos Intercept X
+- No 3rd-party products needed for this integration
+
+LICENSING MODEL
+================
+- Sophos Firewall: hardware purchase + annual subscription bundle
+  Bundle includes: Base Firewall, Network Protection, Web Protection, Email Protection, Enhanced Support
+  Or: TotalProtect Plus (all-in-one)
+- Intercept X: per-device per-year subscription via Sophos Central
+- Tiers: Intercept X → Intercept X Advanced → Intercept X Advanced with XDR
+- Subscription channels: MSP (monthly) or annual
+
+SIZING GUIDE
+============
+- <20 users (SOHO)          : XGS 87
+- 20-50 users               : XGS 107 / XGS 116
+- 50-150 users              : XGS 126 / XGS 136
+- 150-500 users             : XGS 2100 / XGS 2300
+- 500-1,000 users           : XGS 3100 / XGS 3300
+- DC / 1,000+ users         : XGS 4300 / XGS 4500
+- Endpoint: price per device (no minimum, any volume)
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+=====================================
+- Sophos Firewall as perimeter NGFW replacing aging hardware
+- Intercept X for endpoint protection replacing legacy AV
+- Synchronized Security (Firewall + Endpoint combo)
+- Email security for Microsoft 365 tenants
+- Subscription renewals (Sophos Status tracked in VRCOMM_Subscriptions.xlsx)

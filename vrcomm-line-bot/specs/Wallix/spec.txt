@@ -1,0 +1,98 @@
+WALLIX — Product Spec Sheet
+Website: https://www.wallix.com/
+Category: Privileged Access Management (PAM), Zero Trust
+
+PRODUCT OVERVIEW
+================
+WALLIX is a Privileged Access Management (PAM) platform that controls, monitors, and audits
+access by privileged users (admins, IT staff, vendors/contractors) to critical systems.
+Prevents insider threat and meets compliance requirements (ISO 27001, PDPA, SOC2, PCI-DSS).
+
+PRODUCT COMPONENTS
+==================
+
+1. WALLIX Bastion (Core PAM)
+   - Session Manager: proxy-based privileged session control (no agent on target)
+   - Password Vault: store and rotate credentials for servers, databases, network devices
+   - Access Manager: define who can access what, when, with approval workflow
+   - Session recording: full video/text recording of all privileged sessions
+   - Supported protocols: SSH, RDP, HTTPS, Telnet, FTP, VNC, X11
+
+2. WALLIX Access Manager (WAM)
+   - Web-based launcher portal — users launch sessions from browser
+   - No client software needed on user workstation
+   - One-click access to approved systems via HTML5 browser
+   - Session audit trail visible to security team in real-time
+
+3. WALLIX Application-to-Application (AAPM)
+   - Manages privileged credentials used by automated scripts and applications
+   - Eliminates hardcoded passwords in scripts, batch jobs, CI/CD pipelines
+   - API-based credential retrieval for DevOps tools
+
+4. WALLIX Cloud Bastion
+   - SaaS delivery of WALLIX Bastion
+   - No on-premise server required
+   - Access cloud infrastructure (AWS, Azure, GCP) + on-prem systems
+   - Same feature set as on-premise Bastion
+
+5. WALLIX Trustelem (IDaaS / SSO)
+   - Cloud Identity as a Service
+   - Single Sign-On for web applications (SAML, OIDC)
+   - Multi-factor authentication (MFA)
+   - Integrates with Bastion for privileged access workflow
+
+KEY FEATURES
+============
+- Just-in-time (JIT) access: grant temporary privilege, auto-revoke after session
+- Dual-control: require second approver before sensitive session starts
+- Live session monitoring: security team can watch sessions in real-time and terminate if needed
+- Full audit trail: tamper-proof logs for compliance (who accessed what, when, commands run)
+- Passwordless access: users never see target system passwords — Bastion injects credentials
+- Least privilege enforcement: users get minimum access required per request
+- Vendor/3rd-party access: time-limited access for external contractors without VPN
+
+TECHNICAL REQUIREMENTS
+======================
+- WALLIX Bastion: Linux server (CentOS/RHEL/Debian) or hardware appliance
+  Minimum: 4 CPU, 8 GB RAM, 200 GB storage for small deployment
+- No agent required on monitored servers (proxy-based architecture)
+- Network: Bastion sits between users and target systems (SSH/RDP proxy)
+- Firewall rule: users → Bastion (22/3389) → Target servers (22/3389)
+- Database: PostgreSQL (bundled), MariaDB for larger deployments
+- HA: Active-Passive cluster supported
+
+LICENSING
+=========
+- Per-seat per-year subscription (counted by number of privileged users — typically IT admins)
+- Modules licensed separately: Session Manager, Password Vault, Access Manager
+- Bundle: WALLIX One (all modules)
+- Cloud Bastion: per-seat SaaS subscription
+- Minimum: 10-seat license for small IT teams
+
+SIZING GUIDE
+============
+- Small IT team (5-20 admins, <50 target systems): Standard appliance or VM
+- Medium (20-100 admins, 50-500 targets): Medium VM + dedicated DB
+- Large (100+ admins, 500+ targets): HA cluster + external PostgreSQL
+
+COMPLIANCE ALIGNMENT
+====================
+- PDPA: audit trail of who accessed personal data systems
+- ISO 27001: A.9.4 System and application access control
+- PCI-DSS: Requirement 8 — identify and authenticate access to system components
+- HIPAA, SOC2: privileged access audit requirements
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Control IT admin access to servers, firewalls, network equipment
+- Vendor / outsourced IT team access management (time-limited, recorded)
+- Database admin (DBA) session recording for compliance
+- Just-in-time production access for DevOps teams
+- Rotate service account passwords automatically (eliminate stale credentials)
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- Wallix + Varonis: Wallix controls privileged sessions, Varonis monitors data access from those sessions
+- Wallix + LogPoint: Bastion session logs forwarded to SIEM for correlation
+- Wallix + Entrust/AppviewX: certificate-based auth for Bastion sessions
+- Wallix + Sangfor/Hillstone NGFW: network segmentation + PAM for defense-in-depth

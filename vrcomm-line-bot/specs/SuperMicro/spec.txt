@@ -1,0 +1,93 @@
+SUPERMICRO — Product Spec Sheet
+Website: https://www.supermicro.com/en/
+Category: Server Hardware, Storage, GPU Servers, Edge Computing, Data Centre Infrastructure
+
+PRODUCT OVERVIEW
+================
+Super Micro Computer, Inc. (Supermicro) is a global server and storage hardware manufacturer.
+VRCOMM sells Supermicro servers as hardware platforms for security appliances, backup servers,
+monitoring systems, and compute infrastructure deployed at customer sites.
+
+PRODUCT FAMILIES
+================
+
+1. General Purpose Rackmount Servers (1U/2U)
+   - AS-1015SV / AS-2015SV: AMD EPYC processor-based, 1U/2U
+   - SYS-1114S / SYS-2114S: Intel Xeon Scalable (4th Gen), 1U/2U
+   - Key specs (typical 1U):
+     - CPU: 1x or 2x Intel Xeon or AMD EPYC
+     - RAM: 8-32 DIMM slots, up to 4-8 TB DDR5 ECC
+     - Storage: 4-12x 3.5" or 2.5" bays (SATA/SAS/NVMe)
+     - Networking: onboard 1GbE/10GbE, PCIe slots for additional NICs
+     - Power: 400W-1200W redundant PSU
+
+2. High-Density / Twin Pro Servers
+   - BigTwin / Twin Pro: 2 or 4 nodes in 2U chassis
+   - Each node: independent server, shared backplane
+   - Use case: high compute density, virtualisation clusters, cloud-edge
+
+3. Storage Servers (NAS / SAN)
+   - SSG series: 24/36/60 bay storage servers
+   - Supports JBOD, RAID via SAS expander or HBA
+   - Use case: Arcserve backup target, NetEvid packet capture storage, LogPoint log storage
+
+4. GPU / AI Servers
+   - SYS-4U series: up to 8x GPU (NVIDIA A100/H100)
+   - Use case: AI/ML training, data analytics — less common in security deployments
+
+5. Edge / IoT Servers
+   - SuperEdge: compact, fanless options for harsh environments
+   - IoT gateway form factors for remote sites
+   - Use case: remote branch compute, SDN edge nodes
+
+6. Chassis & Blade Systems
+   - MicroBlade: dense compute for virtualisation
+   - SuperBlade: 7U chassis with up to 20 blade modules
+
+KEY FEATURES
+============
+- IPMI / iKVM: out-of-band management (remote console, power control, sensor monitoring)
+- Supermicro BMC (IPMI 2.0): monitor temperature, fan speed, PSU health, POST status
+- Flexible configuration: mix CPU, RAM, storage to match specific use case
+- Component availability: Intel/AMD CPUs, enterprise-grade HDDs/SSDs/NVMe
+- Certifications: CE, FCC, RoHS, Energy Star, EPEAT, UL
+- Green computing: 80 PLUS Platinum/Titanium PSU efficiency
+
+COMMON CONFIGURATIONS AT VRCOMM CUSTOMERS
+==========================================
+
+For Security Appliances / Virtual Firewalls:
+  - 1U, 2x Intel Xeon, 64-128 GB RAM, 2x NVMe SSD (OS), multi-port 10GbE NIC
+  - Runs: Hillstone CloudEdge, Sangfor virtual NGFW, LogPoint SIEM
+
+For Backup Server (Arcserve):
+  - 2U, 1x Xeon, 32-64 GB RAM, 12x 8TB SATA (storage pool), RAID controller
+  - Runs: Arcserve UDP console + dedup store
+
+For Packet Capture (NetEvid):
+  - 2U, 2x Xeon, 128 GB RAM, 2x high-speed NIC (10G/25G), 24x 4TB HDD (capture storage)
+  - Runs: NetEvid FPC appliance software
+
+For SIEM (LogPoint):
+  - 1U-2U, 1x Xeon, 64-128 GB RAM, 4x NVMe SSD (OS+DB), JBOD expansion for logs
+  - Runs: LogPoint SIEM server
+
+LICENSING / PURCHASING
+======================
+- Hardware: one-time purchase
+- Optional: Supermicro SFT-OOB-LIC for advanced IPMI remote management features
+- Support: 3-year warranty standard, extended 5-year available
+- Thai importer: local stock availability varies by model — lead time 2-4 weeks for custom configs
+
+SIZING GUIDANCE
+===============
+- Contact VRCOMM Sales for BOM (Bill of Materials) to match specific software requirements
+- Common request: provide software vendor's hardware requirement sheet → VRCOMM recommends Supermicro model
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- SuperMicro + Arcserve: backup server hardware
+- SuperMicro + LogPoint: SIEM server hardware
+- SuperMicro + NetEvid: packet capture server (high storage, fast NIC)
+- SuperMicro + Hillstone/Sangfor: virtualised NGFW on bare-metal compute
+- SuperMicro + NetGain: monitoring server hardware

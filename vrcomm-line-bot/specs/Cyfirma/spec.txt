@@ -1,0 +1,85 @@
+CYFIRMA — Product Spec Sheet
+Website: https://www.cyfirma.com/
+Category: Cyber Threat Intelligence (CTI), External Attack Surface Management (EASM), Dark Web Monitoring
+
+PRODUCT OVERVIEW
+================
+CYFIRMA is an External Threat Landscape Management (ETLM) platform that provides
+continuous threat intelligence, dark web monitoring, and external attack surface visibility.
+It gives organisations advance warning of targeted attacks before they happen.
+
+PRODUCT PLATFORM: DeCYFIR
+==========================
+
+1. Threat Intelligence (CTI)
+   - Real-time intelligence from 200,000+ dark web, deep web, and open-source sources
+   - Nation-state actor tracking: APT groups, ransomware gangs targeting your sector
+   - Industry-specific threat feeds: financial, healthcare, government, manufacturing
+   - Indicators of Compromise (IoC): IPs, domains, hashes, URLs — ready to import to SIEM/firewall
+   - Threat actor profiles: motivation, TTPs (MITRE ATT&CK mapped), tools used
+   - Early warning: detect when your brand/IP/domain is mentioned in attacker forums
+
+2. External Attack Surface Management (EASM)
+   - Continuously discover your internet-facing assets: IPs, domains, subdomains, cloud resources
+   - Identify exposed services: open ports, misconfigured services, unpatched software
+   - Shadow IT detection: find cloud assets your IT team doesn't know about
+   - Certificate monitoring: expired/weak certificates on public-facing services
+   - Vulnerability correlation: map discovered assets to CVEs and active exploits
+
+3. Brand Intelligence & Phishing Detection
+   - Monitor for fake domains impersonating your brand (typosquatting)
+   - Detect phishing pages and fraudulent mobile apps using your brand
+   - Social media monitoring: impersonation accounts on Facebook, LinkedIn, Twitter
+   - Takedown support: evidence package for domain/page takedown requests
+
+4. Dark Web Monitoring
+   - Monitor dark web forums and marketplaces for:
+     - Leaked credentials (email/password combos from your domain)
+     - Stolen data for sale (databases, customer records)
+     - Discussions about attacking your organisation
+     - Ransomware group communications targeting your sector
+   - Alerts: immediate notification when your data appears in dark web
+
+5. Vulnerability Intelligence
+   - Correlate your asset inventory with CVE database
+   - Prioritise patching by exploit availability and active exploitation in the wild
+   - Zero-day early warning: detect vendor advisories before public disclosure
+   - Patch management guidance: recommended remediation timeline per CVE
+
+KEY DIFFERENTIATORS
+====================
+- Predictive intelligence: warning 3-6 weeks before attack, not after
+- Thai-language threat reports available for local context
+- Southeast Asia regional threat coverage: APT41, Lazarus, local cybercrime groups
+- MITRE ATT&CK framework alignment for all threat intelligence
+
+DELIVERY MODEL
+==============
+- SaaS platform (DeCYFIR web console)
+- No on-premise deployment required
+- API: export IoCs and alerts to SIEM, SOAR, firewall
+- Reports: executive, technical, and compliance formats
+- Threat analyst support: CYFIRMA analysts available for threat briefings
+
+LICENSING
+=========
+- Annual subscription per platform module
+- Tiers: Starter (CTI only) → Professional (CTI + EASM) → Enterprise (full platform)
+- Pricing based on organisation size (employee count / domain count)
+- Add-ons: brand monitoring, supply chain intelligence, managed threat briefing
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Know before you're attacked: early warning from dark web intelligence
+- Leaked credential detection: find out if employee credentials are for sale
+- Phishing prevention: detect fake domains before customers are victimised
+- Executive threat briefing: monthly report for CISO/board on threats facing the organisation
+- PDPA compliance: know if customer data has been leaked and respond promptly
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- Cyfirma + LogPoint: push CYFIRMA IoCs to LogPoint SIEM for automated blocking
+- Cyfirma + Hillstone/Sangfor: import threat intel feeds to firewall block list
+- Cyfirma + Sophos Intercept X: IoC-based endpoint blocking via Sophos Live Response
+- Cyfirma + Trellix: enrich Trellix XDR with CYFIRMA external threat context
+- Cyfirma + Ubika WAF: block malicious IPs on WAF based on CYFIRMA threat feeds

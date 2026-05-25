@@ -1,0 +1,80 @@
+APPVIEWX — Product Spec Sheet
+Website: https://www.appviewx.com/
+Category: PKI Automation, Certificate Lifecycle Management (CLM), Machine Identity Management
+
+PRODUCT OVERVIEW
+================
+AppviewX is a Machine Identity Management and PKI automation platform.
+It automates the full lifecycle of digital certificates and cryptographic keys
+across enterprise environments — preventing outages caused by expired certificates
+and enabling Zero Trust security with automated provisioning.
+
+PRODUCT MODULES
+===============
+
+1. AppviewX CERT+ (Certificate Lifecycle Management)
+   - Discovers all certificates across the network (agentless scan)
+   - Centralized inventory: shows all certs, expiry dates, issuing CA, key strength
+   - Automated renewal workflow: request → approve → sign → deploy → verify
+   - Integrations: Microsoft CA, DigiCert, Sectigo, Entrust, Let's Encrypt, AWS ACM
+   - Alerts: expiry warnings at 90/60/30/7 days
+   - Supports: SSL/TLS, code signing, S/MIME, device certificates
+
+2. AppviewX PKI+ (Private PKI as a Service)
+   - Cloud-hosted or on-premise Private Certificate Authority
+   - Issue internal certificates for servers, devices, users
+   - Template-based certificate policies
+   - SCEP, EST, ACME protocol support (for automated machine enrollment)
+   - HSM integration for key protection
+
+3. AppviewX ADC+ (Application Delivery Automation)
+   - Automates configuration changes on load balancers and ADCs
+   - Supported ADCs: A10 Networks, F5, Citrix, Kemp
+   - Push certificate updates to load balancers automatically
+   - Multi-vendor configuration templates
+   - Change workflows with approval gates
+
+4. AppviewX NetOps (Network Automation)
+   - Network device configuration automation
+   - Firewall rule lifecycle management (request → approve → deploy → expire)
+   - Change Management workflow integration (ServiceNow, Jira)
+   - Supports: Hillstone, Sangfor, Sophos Firewall, plus other vendors
+
+KEY FEATURES
+============
+- Certificate discovery: active scan (HTTPS port 443) + passive (network tap integration)
+- Zero-touch renewal: fully automated certificate renewal on supported platforms
+- REST API: integrate with DevOps pipelines (Jenkins, GitLab CI, Ansible)
+- RBAC: role-based access for different teams (security, network, app teams)
+- Audit trail: every certificate action logged for compliance
+- Risk dashboard: show expired, weak-key (RSA <2048, SHA-1) certificates
+
+TECHNICAL REQUIREMENTS
+======================
+- Deployment: on-premise (Linux VM) or SaaS
+- On-prem server: 8 CPU, 32 GB RAM, 500 GB storage
+- Supported certificate stores: Windows Certificate Store, Java Keystore (JKS), PEM/PKCS12
+- Discovery agents: optional lightweight agent for closed network segments
+- Integrations: LDAP/AD for authentication, SMTP for notifications
+
+LICENSING
+=========
+- Per certificate under management per year
+- Or per-module subscription (CLM, PKI+, ADC+, NetOps separately)
+- SaaS: fully subscription-based
+- On-prem: annual subscription or perpetual + maintenance
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Prevent SSL certificate expiry outages (websites, APIs going down)
+- Automate certificate renewal on web servers and load balancers (A10 Networks)
+- Build internal PKI for device/user certificates (IoT, VPN, 802.1X)
+- DevOps: auto-issue certificates in CI/CD pipeline
+- Compliance: report on all certificate usage for audit
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- AppviewX + Entrust: AppviewX manages lifecycle, Entrust acts as issuing CA
+- AppviewX + Sectigo: AppviewX as CLM front-end, Sectigo as public CA
+- AppviewX + A10 Networks: push renewed certs to A10 ADC automatically
+- AppviewX + Wallix: certificate-based authentication for PAM privileged sessions

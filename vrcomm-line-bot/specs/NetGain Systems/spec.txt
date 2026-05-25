@@ -1,0 +1,96 @@
+NETGAIN SYSTEMS — Product Spec Sheet
+Website: https://www.netgain-systems.com/
+Category: Network Performance Monitoring (NPM), Infrastructure Monitoring, Application Performance
+
+PRODUCT OVERVIEW
+================
+NetGain Systems provides a unified IT infrastructure monitoring platform covering
+network performance, server health, application availability, and capacity planning.
+It gives IT teams a single console to monitor the entire infrastructure stack.
+
+PRODUCT: NetGain Enterprise Manager (EM)
+=========================================
+
+1. Network Performance Monitoring (NPM)
+   - SNMP polling: collect bandwidth utilisation, error rates, packet loss from all network devices
+   - NetFlow / sFlow / IPFIX: traffic analysis — who is consuming bandwidth and what applications
+   - Interface monitoring: real-time and historical graphs per interface (in/out bps, utilisation %)
+   - Threshold alerting: alert when interface exceeds 80% utilisation or packet loss >1%
+   - Topology discovery: auto-discover and map network topology via SNMP/CDP/LLDP
+   - Supported devices: any SNMP-capable device (routers, switches, firewalls, wireless APs)
+
+2. Server & Infrastructure Monitoring
+   - Windows: WMI-based monitoring (CPU, memory, disk, services, event logs)
+   - Linux/Unix: SNMP or agent-based (SSH)
+   - VMware vSphere: VM performance, datastore utilisation, host health
+   - Hyper-V: VM and host monitoring
+   - Hardware: IPMI/iDRAC/iLO for physical server health (temperature, fan, PSU)
+   - Cloud: AWS CloudWatch, Azure Monitor integration
+
+3. Application Availability Monitoring
+   - URL monitoring: HTTP/HTTPS check with response time and content verification
+   - Port monitoring: TCP/UDP port availability check
+   - Transaction monitoring: simulate multi-step web transactions
+   - DNS / SMTP / FTP availability checks
+   - SLA reporting: uptime % per monitored service
+
+4. Database Monitoring
+   - MSSQL, MySQL, Oracle, PostgreSQL: query response time, connection pool, tablespace
+   - Slow query detection and alert
+
+5. Alerts & Notifications
+   - Alert channels: email, SMS, LINE Notify, PagerDuty
+   - Escalation policy: tier-1 → tier-2 → manager if not acknowledged
+   - Maintenance windows: suppress alerts during planned downtime
+   - Alert correlation: suppress child alerts when parent device is down
+
+6. Reporting & Dashboards
+   - Executive dashboards: infrastructure health at a glance
+   - Capacity planning reports: trend analysis, projected saturation dates
+   - SLA reports: monthly availability report per service
+   - Custom reports: scheduled email delivery
+
+KEY FEATURES
+============
+- Agentless for network devices (SNMP), lightweight agent optional for servers
+- Multi-site support: monitor branch offices from central console
+- Auto-discovery: find new devices added to network automatically
+- REST API: integrate with ITSM tools and custom dashboards
+- Role-based access: NOC team, management, application team with different views
+
+TECHNICAL REQUIREMENTS
+======================
+- NetGain EM Server: Windows Server 2016+ or Linux (RHEL/CentOS)
+  Minimum: 4 CPU, 8 GB RAM, 200 GB storage
+- Database: SQL Server Express (bundled) or full SQL Server for larger deployments
+- SNMP: UDP 161 from NetGain server to all managed devices
+- Web UI: browser-based (Chrome, Firefox, Edge)
+
+LICENSING
+=========
+- Per monitored node per year (router = 1 node, server = 1 node, VM = 1 node)
+- Modules: base NPM + Flow analysis + Application monitoring — can be licensed separately
+- Perpetual option + annual maintenance available
+
+SIZING GUIDE
+============
+- Up to 100 nodes   : Standard deployment, single server
+- 100-500 nodes     : Medium VM, dedicated SQL Server
+- 500-2,000 nodes   : Large VM, dedicated DB server
+- 2,000+ nodes      : Distributed with remote pollers
+
+COMMON USE CASES AT VRCOMM CUSTOMERS
+======================================
+- Monitor all network devices: know about congestion before users complain
+- Server health monitoring: CPU/memory/disk alert before server crashes
+- WAN link monitoring: track utilisation of MPLS or internet links
+- Application availability: know immediately if a critical web app goes down
+- Capacity planning: forecast when to upgrade bandwidth or add servers
+
+PAIRING WITH OTHER VRCOMM PRODUCTS
+====================================
+- NetGain + LogPoint SIEM: performance metrics and alerts from NetGain forwarded to SIEM
+- NetGain + Hillstone/Sangfor: monitor firewall interface utilisation and performance stats
+- NetGain + SuperMicro: monitor SuperMicro server hardware health (IPMI)
+- NetGain + BackBox: BackBox handles config backup, NetGain handles performance monitoring
+- NetGain + A10 Networks: monitor ADC virtual server response times and health
