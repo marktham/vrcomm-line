@@ -109,6 +109,85 @@ def _extract_pdf_text(path_or_bytes, max_chars: int = 4000) -> str:
         return ""
 
 
+def _extract_docx_text(path_or_bytes, max_chars: int = 4000) -> str:
+    """Extract plain text from a .docx file or bytes using python-docx."""
+    try:
+        from docx import Document
+        import io
+        source = io.BytesIO(path_or_bytes) if isinstance(path_or_bytes, bytes) else path_or_bytes
+        doc = Document(source)
+        parts = []
+        for para in doc.paragraphs:
+            if para.text.strip():
+                parts.append(para.text.strip())
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = " | ".join(
+                    cell.text.strip() for cell in row.cells if cell.text.strip()
+                )
+                if row_text:
+                    parts.append(row_text)
+        return "\n".join(parts)[:max_chars]
+    except ImportError:
+        logger.warning("[engineer_agent] python-docx not installed — .docx skipped")
+        return ""
+    except Exception as e:
+        logger.warning("[engineer_agent] DOCX extract error: %s", e)
+        return ""
+
+
+def _extract_pptx_text(path_or_bytes, max_chars: int = 4000) -> str:
+    """Extract plain text from a .pptx file or bytes using python-pptx."""
+    try:
+        from pptx import Presentation
+        import io
+        source = io.BytesIO(path_or_bytes) if isinstance(path_or_bytes, bytes) else path_or_bytes
+        prs = Presentation(source)
+        parts = []
+        for slide_num, slide in enumerate(prs.slides, 1):
+            slide_texts = []
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    for para in shape.text_frame.paragraphs:
+                        text = para.text.strip()
+                        if text:
+                            slide_texts.append(text)
+                # Extract table cells
+                if shape.has_table:
+                    for row in shape.table.rows:
+                        row_text = " | ".join(
+                            cell.text.strip() for cell in row.cells if cell.text.strip()
+                        )
+                        if row_text:
+                            slide_texts.append(row_text)
+            # Include slide notes if present
+            if slide.has_notes_slide:
+                notes = slide.notes_slide.notes_text_frame.text.strip()
+                if notes:
+                    slide_texts.append("[Notes: %s]" % notes)
+            if slide_texts:
+                parts.append("[Slide %d]\n%s" % (slide_num, "\n".join(slide_texts)))
+        return "\n\n".join(parts)[:max_chars]
+    except ImportError:
+        logger.warning("[engineer_agent] python-pptx not installed — .pptx skipped")
+        return ""
+    except Exception as e:
+        logger.warning("[engineer_agent] PPTX extract error: %s", e)
+        return ""
+
+
+def _extract_file(fpath_or_bytes, filename: str, max_chars: int = 3000) -> str:
+    """Route to the correct extractor based on file extension."""
+    ext = filename.lower().rsplit(".", 1)[-1]
+    if ext == "pdf":
+        return _extract_pdf_text(fpath_or_bytes, max_chars)
+    elif ext == "docx":
+        return _extract_docx_text(fpath_or_bytes, max_chars)
+    elif ext == "pptx":
+        return _extract_pptx_text(fpath_or_bytes, max_chars)
+    return ""
+
+
 # ── Local spec loader (folder-based) ─────────────────────────────────────────
 
 _spec_cache: dict = {}   # brand_key → {"content": str, "mtime": float}
@@ -154,40 +233,39 @@ def _load_spec_local(brand: str) -> str:
     folder = _brand_folder_match(brand)
     if folder:
         try:
-            all_files = os.listdir(folder)
-            txt_files = sorted([
-                os.path.join(folder, f) for f in all_files
-                if f.lower().endswith((".txt", ".md"))
-            ])
-            pdf_files = sorted([
-                os.path.join(folder, f) for f in all_files
-                if f.lower().endswith(".pdf")
-            ])
-            all_spec_files = txt_files + pdf_files
+            _TEXT_EXTS = (".txt", ".md")
+            _RICH_EXTS = (".pdf", ".docx", ".pptx")
 
-            if all_spec_files:
-                max_mtime = max(os.path.getmtime(f) for f in all_spec_files)
-                cached = _spec_cache.get(brand_key)
+            all_files   = os.listdir(folder)
+            txt_files   = sorted([f for f in all_files if f.lower().endswith(_TEXT_EXTS)])
+            rich_files  = sorted([f for f in all_files if f.lower().endswith(_RICH_EXTS)])
+            all_spec    = txt_files + rich_files
+
+            if all_spec:
+                all_paths  = [os.path.join(folder, f) for f in all_spec]
+                max_mtime  = max(os.path.getmtime(p) for p in all_paths)
+                cached     = _spec_cache.get(brand_key)
                 if cached and cached.get("mtime") == max_mtime:
                     return cached["content"]
 
                 parts = []
-                # Read text/markdown files
-                for fpath in txt_files:
+                for fname in txt_files:
+                    fpath = os.path.join(folder, fname)
                     with open(fpath, "r", encoding="utf-8", errors="ignore") as fh:
                         parts.append(fh.read())
-                # Extract PDF files
-                for fpath in pdf_files:
-                    pdf_text = _extract_pdf_text(fpath, max_chars=3000)
-                    if pdf_text:
-                        fname = os.path.basename(fpath)
-                        parts.append("[PDF: %s]\n%s" % (fname, pdf_text))
-                        logger.info("[engineer_agent] Extracted PDF: %s", fname)
 
-                content = "\n\n".join(parts)[:8000]
+                for fname in rich_files:
+                    fpath = os.path.join(folder, fname)
+                    extracted = _extract_file(fpath, fname, max_chars=3000)
+                    if extracted:
+                        ext = fname.rsplit(".", 1)[-1].upper()
+                        parts.append("[%s: %s]\n%s" % (ext, fname, extracted))
+                        logger.info("[engineer_agent] Extracted %s: %s", ext, fname)
+
+                content = "\n\n".join(parts)[:10000]
                 _spec_cache[brand_key] = {"content": content, "mtime": max_mtime}
-                logger.info("[engineer_agent] Loaded spec folder: %s (%d txt, %d pdf)",
-                            folder, len(txt_files), len(pdf_files))
+                logger.info("[engineer_agent] Loaded spec folder: %s (%d txt, %d rich)",
+                            folder, len(txt_files), len(rich_files))
                 return content
         except Exception as e:
             logger.warning("[engineer_agent] Spec folder load error [%s]: %s", folder, e)
@@ -331,14 +409,12 @@ def _load_spec_sharepoint(brand: str) -> str:
         logger.warning("[engineer_agent] SharePoint folder list error [%s]: %s", brand, e)
         return ""
 
-    # Step 2: Download each .txt / .md / .pdf file
+    # Step 2: Download each supported spec file
+    _SUPPORTED = (".txt", ".md", ".pdf", ".docx", ".pptx")
     parts = []
     for item in files:
         name = item.get("name", "")
-        name_lower = name.lower()
-        is_text = name_lower.endswith((".txt", ".md"))
-        is_pdf  = name_lower.endswith(".pdf")
-        if not (is_text or is_pdf):
+        if not name.lower().endswith(_SUPPORTED):
             continue
         download_url = item.get("@microsoft.graph.downloadUrl")
         if not download_url:
@@ -346,15 +422,16 @@ def _load_spec_sharepoint(brand: str) -> str:
         try:
             dl = requests.get(download_url, timeout=15)
             dl.raise_for_status()
-            if is_pdf:
-                pdf_text = _extract_pdf_text(dl.content, max_chars=3000)
-                if pdf_text:
-                    parts.append("[PDF: %s]\n%s" % (name, pdf_text))
-                    logger.info("[engineer_agent] SharePoint PDF extracted: %s for '%s'",
-                                name, brand)
-            else:
+            if name.lower().endswith((".txt", ".md")):
                 parts.append(dl.text[:3000])
-                logger.info("[engineer_agent] SharePoint: downloaded %s for '%s'", name, brand)
+                logger.info("[engineer_agent] SharePoint downloaded: %s for '%s'", name, brand)
+            else:
+                extracted = _extract_file(dl.content, name, max_chars=3000)
+                if extracted:
+                    ext = name.rsplit(".", 1)[-1].upper()
+                    parts.append("[%s: %s]\n%s" % (ext, name, extracted))
+                    logger.info("[engineer_agent] SharePoint %s extracted: %s for '%s'",
+                                ext, name, brand)
         except Exception as e:
             logger.warning("[engineer_agent] SharePoint download error [%s]: %s", name, e)
 
