@@ -710,7 +710,8 @@ def _build_product_specs_section(selected: list) -> str:
 
         section = "=== %s ===\nWebsite: %s" % (p["brand"], p["url"])
         if spec_content:
-            section += "\n\n%s" % spec_content[:2000]
+            # Allow up to 6000 chars per brand so PDF/PPTX/DOCX content isn't cut off
+            section += "\n\n%s" % spec_content[:6000]
         sections.append(section)
     return "\n\n".join(sections) if sections else "(No spec content available)"
 
