@@ -546,32 +546,76 @@ def debug_spec(brand: str):
     import os
     from agents.engineer_agent import (
         _brand_folder_match, _load_spec_local, _load_spec_file,
+        _extract_pdf_text, _extract_pptx_text, _extract_docx_text,
         _SPECS_DIR,
     )
 
-    specs_dir   = _SPECS_DIR
+    # ── Library availability check ────────────────────────────────────────────
+    libs = {}
+    for lib in ("pdfplumber", "pptx", "docx"):
+        try:
+            __import__(lib)
+            libs[lib] = "installed"
+        except ImportError:
+            libs[lib] = "NOT INSTALLED"
+
+    # ── Folder & file info ────────────────────────────────────────────────────
     folder      = _brand_folder_match(brand)
     local_files = []
+    file_details = []
 
     if folder and os.path.isdir(folder):
         local_files = os.listdir(folder)
+        for fname in local_files:
+            fpath = os.path.join(folder, fname)
+            ext   = fname.lower().rsplit(".", 1)[-1] if "." in fname else ""
+            info  = {"name": fname, "ext": ext, "size_bytes": os.path.getsize(fpath)}
 
-    local_content = _load_spec_local(brand)
-    full_content  = _load_spec_file(brand)
+            # Try extracting rich files individually to check for errors
+            if ext == "pptx":
+                try:
+                    text = _extract_pptx_text(fpath, max_chars=200)
+                    info["extract_status"] = "OK" if text else "empty result"
+                    info["extract_preview"] = text[:200]
+                except Exception as e:
+                    info["extract_status"] = "ERROR: %s" % str(e)
+            elif ext == "pdf":
+                try:
+                    text = _extract_pdf_text(fpath, max_chars=200)
+                    info["extract_status"] = "OK" if text else "empty result"
+                    info["extract_preview"] = text[:200]
+                except Exception as e:
+                    info["extract_status"] = "ERROR: %s" % str(e)
+            elif ext == "docx":
+                try:
+                    text = _extract_docx_text(fpath, max_chars=200)
+                    info["extract_status"] = "OK" if text else "empty result"
+                    info["extract_preview"] = text[:200]
+                except Exception as e:
+                    info["extract_status"] = "ERROR: %s" % str(e)
+
+            file_details.append(info)
+
+    # ── Content load ─────────────────────────────────────────────────────────
+    # Clear cache to force fresh load
+    from agents.engineer_agent import _spec_cache
+    _spec_cache.pop(brand.lower(), None)
+
+    full_content = _load_spec_file(brand)
+    has_pptx_tag = "[PPTX:" in full_content
+    has_pdf_tag  = "[PDF:"  in full_content
+    has_docx_tag = "[DOCX:" in full_content
 
     return jsonify({
-        "brand":              brand,
-        "specs_dir":          specs_dir,
-        "folder_found":       folder or "(not found)",
-        "files_in_folder":    local_files,
-        "local_chars":        len(local_content),
-        "local_preview":      local_content[:500] if local_content else "(empty)",
-        "full_chars":         len(full_content),
-        "full_preview":       full_content[:500] if full_content else "(empty — will fallback to URL fetch)",
-        "note": (
-            "If local_chars=0 but files exist, check that pdfplumber/python-docx/python-pptx "
-            "are installed and the file is not corrupted."
-        ),
+        "brand":           brand,
+        "libraries":       libs,
+        "folder_found":    folder or "(not found)",
+        "file_details":    file_details,
+        "content_chars":   len(full_content),
+        "has_pptx_content": has_pptx_tag,
+        "has_pdf_content":  has_pdf_tag,
+        "has_docx_content": has_docx_tag,
+        "content_preview": full_content[:800] if full_content else "(empty)",
     })
 
 
