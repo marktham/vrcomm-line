@@ -75,6 +75,40 @@ def _load_product_list() -> list:
         return []
 
 
+# ── PDF text extractor ───────────────────────────────────────────────────────
+
+def _extract_pdf_text(path_or_bytes, max_chars: int = 4000) -> str:
+    """
+    Extract plain text from a PDF file or bytes object using pdfplumber.
+    Falls back to empty string if pdfplumber is not installed or extraction fails.
+
+    Args:
+        path_or_bytes : file path (str) OR raw bytes (from SharePoint download)
+        max_chars     : maximum characters to return (keeps context window manageable)
+    """
+    try:
+        import pdfplumber, io
+        source = io.BytesIO(path_or_bytes) if isinstance(path_or_bytes, bytes) else path_or_bytes
+        with pdfplumber.open(source) as pdf:
+            pages_text = []
+            for page in pdf.pages:
+                text = page.extract_text()
+                if text:
+                    pages_text.append(text.strip())
+                # Also extract tables as plain text rows
+                for table in page.extract_tables():
+                    for row in table:
+                        row_clean = [str(c).strip() if c else "" for c in row]
+                        pages_text.append(" | ".join(row_clean))
+            return "\n\n".join(pages_text)[:max_chars]
+    except ImportError:
+        logger.warning("[engineer_agent] pdfplumber not installed — PDF skipped")
+        return ""
+    except Exception as e:
+        logger.warning("[engineer_agent] PDF extract error: %s", e)
+        return ""
+
+
 # ── Local spec loader (folder-based) ─────────────────────────────────────────
 
 _spec_cache: dict = {}   # brand_key → {"content": str, "mtime": float}
@@ -120,26 +154,40 @@ def _load_spec_local(brand: str) -> str:
     folder = _brand_folder_match(brand)
     if folder:
         try:
-            # Use max mtime across all files in the folder as cache key
-            files = [
-                os.path.join(folder, f)
-                for f in os.listdir(folder)
-                if f.endswith((".txt", ".md"))
-            ]
-            if files:
-                max_mtime = max(os.path.getmtime(f) for f in files)
+            all_files = os.listdir(folder)
+            txt_files = sorted([
+                os.path.join(folder, f) for f in all_files
+                if f.lower().endswith((".txt", ".md"))
+            ])
+            pdf_files = sorted([
+                os.path.join(folder, f) for f in all_files
+                if f.lower().endswith(".pdf")
+            ])
+            all_spec_files = txt_files + pdf_files
+
+            if all_spec_files:
+                max_mtime = max(os.path.getmtime(f) for f in all_spec_files)
                 cached = _spec_cache.get(brand_key)
                 if cached and cached.get("mtime") == max_mtime:
                     return cached["content"]
 
                 parts = []
-                for fpath in sorted(files):
+                # Read text/markdown files
+                for fpath in txt_files:
                     with open(fpath, "r", encoding="utf-8", errors="ignore") as fh:
                         parts.append(fh.read())
-                content = "\n\n".join(parts)[:5000]
+                # Extract PDF files
+                for fpath in pdf_files:
+                    pdf_text = _extract_pdf_text(fpath, max_chars=3000)
+                    if pdf_text:
+                        fname = os.path.basename(fpath)
+                        parts.append("[PDF: %s]\n%s" % (fname, pdf_text))
+                        logger.info("[engineer_agent] Extracted PDF: %s", fname)
+
+                content = "\n\n".join(parts)[:8000]
                 _spec_cache[brand_key] = {"content": content, "mtime": max_mtime}
-                logger.info("[engineer_agent] Loaded spec folder: %s (%d files)",
-                            folder, len(files))
+                logger.info("[engineer_agent] Loaded spec folder: %s (%d txt, %d pdf)",
+                            folder, len(txt_files), len(pdf_files))
                 return content
         except Exception as e:
             logger.warning("[engineer_agent] Spec folder load error [%s]: %s", folder, e)
@@ -283,20 +331,30 @@ def _load_spec_sharepoint(brand: str) -> str:
         logger.warning("[engineer_agent] SharePoint folder list error [%s]: %s", brand, e)
         return ""
 
-    # Step 2: Download each .txt / .md file
+    # Step 2: Download each .txt / .md / .pdf file
     parts = []
     for item in files:
         name = item.get("name", "")
-        if not name.lower().endswith((".txt", ".md")):
+        name_lower = name.lower()
+        is_text = name_lower.endswith((".txt", ".md"))
+        is_pdf  = name_lower.endswith(".pdf")
+        if not (is_text or is_pdf):
             continue
         download_url = item.get("@microsoft.graph.downloadUrl")
         if not download_url:
             continue
         try:
-            dl = requests.get(download_url, timeout=10)
+            dl = requests.get(download_url, timeout=15)
             dl.raise_for_status()
-            parts.append(dl.text[:3000])
-            logger.info("[engineer_agent] SharePoint: downloaded %s for '%s'", name, brand)
+            if is_pdf:
+                pdf_text = _extract_pdf_text(dl.content, max_chars=3000)
+                if pdf_text:
+                    parts.append("[PDF: %s]\n%s" % (name, pdf_text))
+                    logger.info("[engineer_agent] SharePoint PDF extracted: %s for '%s'",
+                                name, brand)
+            else:
+                parts.append(dl.text[:3000])
+                logger.info("[engineer_agent] SharePoint: downloaded %s for '%s'", name, brand)
         except Exception as e:
             logger.warning("[engineer_agent] SharePoint download error [%s]: %s", name, e)
 
