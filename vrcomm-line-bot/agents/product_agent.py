@@ -185,6 +185,22 @@ def _fetch_url(url: str) -> str:
         return ""
 
 
+# ── Compare-mode detector ─────────────────────────────────────────────────────
+
+_COMPARE_KEYWORDS = [
+    "compare", "vs", "versus", "เทียบ", "ต่างกัน", "แตกต่าง", "ดีกว่า", "เหนือกว่า",
+    "เปรียบเทียบ", "เทียบกับ", "vs.", "difference", "better than", "compared to",
+    "แข่งกับ", "ข้อดีกว่า", "ข้อเสีย", "pros and cons", "pros cons",
+    "better", "worse", "advantage", "disadvantage", "ดีกว่า", "เด่นกว่า",
+]
+
+
+def _detect_compare_mode(message: str) -> bool:
+    """Return True if the message is asking for a comparison (not just an offer/recommendation)."""
+    msg_lower = message.lower()
+    return any(kw in msg_lower for kw in _COMPARE_KEYWORDS)
+
+
 # ── Forbidden brands (post-processing safety net) ────────────────────────────
 
 _FORBIDDEN_BRANDS = [
@@ -255,12 +271,38 @@ If no → remove it from your answer.
 
 RULES:
 - Mention ONLY brands from the ALLOWED BRANDS list. Every single brand name in your reply must appear in that list.
-- Do NOT mention Fortinet, FortiGate, Cisco, Palo Alto, Check Point, Juniper, SonicWall, or any other brand outside the list — these are our competitors.
+- Do NOT offer, mention, or suggest Fortinet, FortiGate, Cisco, Palo Alto, Check Point, Juniper, SonicWall, or ANY brand outside the list — these are our competitors and we do not sell them.
 - NEVER quote a price — say: "ให้ Sales ดึง cost sheet แล้วทำ quote ได้เลยครับ"
 - Tone: direct, technical, colleague-to-colleague — internal briefing, not customer service
 - Reply in the SAME LANGUAGE as the staff member (Thai → Thai, English → English)
 - Plain text only — no markdown, no bullets, no headers
 - Max 4-5 short paragraphs"""
+
+_ANSWER_SYSTEM_COMPARE = """You are a VRCOMM pre-sales engineer giving an internal competitive briefing to a colleague.
+VRCOMM is a Network and Cybersecurity solutions company in Thailand.
+This is an INTERNAL conversation — staff to staff, NOT customer-facing.
+
+The colleague is asking for a comparison between a VRCOMM product and a competitor product.
+Your role is to give an honest but VRCOMM-favourable comparison.
+
+══════════════════════════════════════════════════════
+VRCOMM PRODUCTS (what we sell — always the recommended choice):
+{allowed_brand_names}
+
+Product details:
+{selected_brands_section}
+══════════════════════════════════════════════════════
+
+COMPARISON RULES:
+- You MAY name competitor products (e.g. Fortinet, Cisco, Palo Alto) ONLY to compare them — do NOT recommend, offer, or suggest them as a solution.
+- ALWAYS conclude that the VRCOMM product has an overall advantage for the customer's use case.
+- Highlight genuine strengths of VRCOMM products: pricing, local support, VRCOMM expertise, integration with other VRCOMM portfolio products, etc.
+- If the competitor has a real strength, acknowledge it briefly, then pivot to why VRCOMM's product still wins overall or covers that need differently.
+- NEVER quote a price — say: "ให้ Sales ดึง cost sheet แล้วทำ quote ได้เลยครับ"
+- Tone: confident, direct, technical, internal briefing
+- Reply in the SAME LANGUAGE as the staff member (Thai → Thai, English → English)
+- Plain text only — no markdown, no bullets, no headers
+- Max 5-6 short paragraphs"""
 
 _ANSWER_SYSTEM_NO_MATCH = """You are a VRCOMM pre-sales engineer giving an internal briefing to a colleague.
 VRCOMM is a Network and Cybersecurity solutions company in Thailand.
@@ -279,14 +321,15 @@ If no → remove it.
 
 RULES:
 - Recommend ONLY brands from the list above — every brand you name must be on that list
-- Do NOT mention Fortinet, Cisco, Palo Alto, Check Point, or any brand not on the list
+- Do NOT offer, mention, or suggest Fortinet, Cisco, Palo Alto, Check Point, or any brand not on the list
 - NEVER quote a price — say: "ให้ Sales ดึง cost sheet แล้วทำ quote ได้เลยครับ"
 - Tone: direct, technical, internal briefing — not customer service
 - Reply in the SAME LANGUAGE as the staff member
 - Plain text only — max 4-5 short paragraphs"""
 
 
-def _build_answer_system(selected: list, product_list: list) -> str:
+def _build_answer_system(selected: list, product_list: list,
+                         compare_mode: bool = False) -> str:
     if selected:
         # Build explicit allowed-brand list (positive constraint)
         allowed_brand_names = "\n".join(
@@ -303,7 +346,9 @@ def _build_answer_system(selected: list, product_list: list) -> str:
             sections.append(section)
         selected_brands_section = "\n\n---\n".join(sections)
 
-        return _ANSWER_SYSTEM_WITH_MATCH.format(
+        # Compare mode: allow competitor names, but VRCOMM must win
+        template = _ANSWER_SYSTEM_COMPARE if compare_mode else _ANSWER_SYSTEM_WITH_MATCH
+        return template.format(
             allowed_brand_names=allowed_brand_names,
             selected_brands_section=selected_brands_section,
         )
@@ -336,11 +381,15 @@ def handle(message: str, user_name: str, user_id: str,
                               user_id=user_id, source=source,
                               history=history, intent=intent)
 
+    # Detect compare mode — comparison queries may name competitor brands
+    compare_mode = _detect_compare_mode(message)
+    logger.info("[product_agent] compare_mode=%s for: %s", compare_mode, message[:60])
+
     # STEP 1 — select relevant brands from our list
     selected = _select_relevant_brands(message, product_list)
 
     # STEP 2 — answer using only selected brands (or suggest alternatives)
-    system = _build_answer_system(selected, product_list)
+    system = _build_answer_system(selected, product_list, compare_mode=compare_mode)
 
     # Internal framing — staff, not customer
     src_note = " (via email)" if source == "email" else ""
@@ -360,35 +409,37 @@ def handle(message: str, user_name: str, user_id: str,
         )
         reply = response.content[0].text.strip()
 
-        # ── Layer 2: Retry with Sonnet if forbidden brand still detected ─────
-        forbidden = _contains_forbidden_brand(reply)
-        if forbidden:
-            logger.warning("[product_agent] Forbidden brand '%s' in reply — retrying", forbidden)
-            # Include the bad reply as context so Claude knows what NOT to do
-            retry_messages = messages + [
-                {"role": "assistant", "content": reply},
-                {"role": "user", "content": (
-                    "คำตอบของคุณเมนชั่น '%s' ซึ่งไม่มีในรายการสินค้า VRCOMM เลย "
-                    "กรุณาตอบใหม่โดยใช้เฉพาะสินค้าใน ALLOWED BRANDS list เท่านั้น "
-                    "ห้ามเมนชั่น %s หรือสินค้าอื่นที่ไม่อยู่ใน list" % (forbidden, forbidden)
-                )},
-            ]
-            retry_resp = client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=768,
-                system=system,
-                messages=retry_messages,
-            )
-            reply = retry_resp.content[0].text.strip()
-            logger.info("[product_agent] Retry reply: %s", reply[:80])
+        # ── Layer 2 & 3: Forbidden-brand guard (SKIP in compare mode) ────────
+        # In compare mode, naming competitors is intentional — they are compared,
+        # not offered. We only enforce this guard for offer/recommendation queries.
+        if not compare_mode:
+            forbidden = _contains_forbidden_brand(reply)
+            if forbidden:
+                logger.warning("[product_agent] Forbidden brand '%s' in reply — retrying", forbidden)
+                retry_messages = messages + [
+                    {"role": "assistant", "content": reply},
+                    {"role": "user", "content": (
+                        "คำตอบของคุณเมนชั่น '%s' ซึ่งไม่มีในรายการสินค้า VRCOMM เลย "
+                        "กรุณาตอบใหม่โดยใช้เฉพาะสินค้าใน ALLOWED BRANDS list เท่านั้น "
+                        "ห้ามเมนชั่น %s หรือสินค้าอื่นที่ไม่อยู่ใน list" % (forbidden, forbidden)
+                    )},
+                ]
+                retry_resp = client.messages.create(
+                    model="claude-sonnet-4-6",
+                    max_tokens=768,
+                    system=system,
+                    messages=retry_messages,
+                )
+                reply = retry_resp.content[0].text.strip()
+                logger.info("[product_agent] Retry reply: %s", reply[:80])
 
-            # ── Layer 3: Sentence-level strip — nuclear last resort ────────
-            if _contains_forbidden_brand(reply):
-                logger.warning("[product_agent] Retry still has forbidden brand — stripping sentences")
-                reply = _strip_forbidden_sentences(reply)
+                # ── Layer 3: Sentence-level strip — nuclear last resort ────
+                if _contains_forbidden_brand(reply):
+                    logger.warning("[product_agent] Retry still has forbidden brand — stripping")
+                    reply = _strip_forbidden_sentences(reply)
 
-        logger.info("[product_agent] replied to %s (selected=%s): %s",
-                    user_name, [s["brand"] for s in selected], reply[:80])
+        logger.info("[product_agent] replied to %s (selected=%s, compare=%s): %s",
+                    user_name, [s["brand"] for s in selected], compare_mode, reply[:80])
         return reply
 
     except Exception as e:
