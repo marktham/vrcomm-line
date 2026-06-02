@@ -535,6 +535,46 @@ def setup_sharepoint():
     return jsonify(result)
 
 
+# ── Spec diagnostic ──────────────────────────────────────────────────────────
+
+@app.route("/debug-spec/<brand>", methods=["GET"])
+def debug_spec(brand: str):
+    """
+    Diagnostic: show what spec content the engineer agent would load for a brand.
+    Visit: https://vrcomm-line.onrender.com/debug-spec/NetEvid
+    """
+    import os
+    from agents.engineer_agent import (
+        _brand_folder_match, _load_spec_local, _load_spec_file,
+        _SPECS_DIR,
+    )
+
+    specs_dir   = _SPECS_DIR
+    folder      = _brand_folder_match(brand)
+    local_files = []
+
+    if folder and os.path.isdir(folder):
+        local_files = os.listdir(folder)
+
+    local_content = _load_spec_local(brand)
+    full_content  = _load_spec_file(brand)
+
+    return jsonify({
+        "brand":              brand,
+        "specs_dir":          specs_dir,
+        "folder_found":       folder or "(not found)",
+        "files_in_folder":    local_files,
+        "local_chars":        len(local_content),
+        "local_preview":      local_content[:500] if local_content else "(empty)",
+        "full_chars":         len(full_content),
+        "full_preview":       full_content[:500] if full_content else "(empty — will fallback to URL fetch)",
+        "note": (
+            "If local_chars=0 but files exist, check that pdfplumber/python-docx/python-pptx "
+            "are installed and the file is not corrupted."
+        ),
+    })
+
+
 # ── Export & health ───────────────────────────────────────────────────────────
 
 @app.route("/export", methods=["GET"])
