@@ -9,7 +9,28 @@ from anthropic import Anthropic
 logger = logging.getLogger(__name__)
 client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
 
-SYSTEM_PROMPT = """You are the VRCOMM Admin, the official first-point-of-contact for VRCOMM Company
+_BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_PRODUCT_LIST = os.path.join(_BASE_DIR, "product", "VRCOMM_ProductList.xlsx")
+
+
+def _get_product_list_text() -> str:
+    """Load brand names from ProductList for injection into system prompt."""
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(_PRODUCT_LIST, read_only=True, data_only=True)
+        ws = wb.active
+        brands = []
+        for row in ws.iter_rows(values_only=True):
+            brand = str(row[0]).strip() if row[0] else ""
+            if brand.lower() in ("brand", "product", "name", "") or not brand:
+                continue
+            brands.append(brand)
+        return ", ".join(brands)
+    except Exception as e:
+        logger.warning("[general_agent] Could not load product list: %s", e)
+        return "various network and cybersecurity products"
+
+_SYSTEM_PROMPT_TEMPLATE = """You are the VRCOMM Admin, the official first-point-of-contact for VRCOMM Company
 -- a Network and Cybersecurity solutions provider in Thailand.
 
 Your role:
@@ -25,9 +46,15 @@ Your role:
 7. For subscription renewals, ask: company name and which product
 8. Build on previous messages -- never ask for information already provided
 
+VRCOMM's product portfolio (the ONLY brands we sell):
+{product_list}
+
+IMPORTANT: If someone asks about any brand in the list above, acknowledge it as part of our portfolio.
+Do NOT say a brand is "not in our portfolio" if it appears in the list above.
+NEVER mention Fortinet, Cisco, Palo Alto, Check Point, or any brand NOT in the list above.
+
 Tone: Warm, professional, concise. Max 3-4 short paragraphs.
 Do NOT mention you are an AI unless asked directly.
-Company: VRCOMM | Products: Fortinet, Sophos, Cisco and other network/cybersecurity brands.
 Format as plain text only -- no markdown, no bullet symbols, no headers."""
 
 
@@ -48,6 +75,9 @@ def handle(message: str, user_name: str, user_id: str,
     if history is None:
         history = []
 
+    # Build system prompt with current product list
+    system = _SYSTEM_PROMPT_TEMPLATE.format(product_list=_get_product_list_text())
+
     # First message in conversation — include context header
     if history:
         content = message
@@ -66,7 +96,7 @@ def handle(message: str, user_name: str, user_id: str,
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=512,
-            system=SYSTEM_PROMPT,
+            system=system,
             messages=messages,
         )
         reply = response.content[0].text.strip()
