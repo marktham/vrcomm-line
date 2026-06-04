@@ -18,14 +18,17 @@ client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
 INTENTS = ["product_info", "quotation", "subscription", "technical", "general"]
 
 CLASSIFIER_SYSTEM = """You are an intent classifier for VRCOMM, a Network and Cybersecurity solutions company in Thailand.
-Products sold: Fortinet, Sophos, Cisco, and other network/cybersecurity brands.
+VRCOMM sells network and cybersecurity products including firewalls, WAF, EDR, SIEM, backup, PKI, and related solutions.
 
 Classify the message into exactly ONE category:
-- product_info  : asking about products, brands, models, features, specs, availability, comparison
-- quotation     : requesting a price quote, asking for pricing, wanting a quotation document, cost inquiry, ขอใบเสนอราคา
-- subscription  : subscription status, renewal, expiry, license management, ต่ออายุ
-- technical     : technical support, spec compliance, TOR/SOW analysis, equipment recommendation, network design
+- product_info  : asking about products, brands, models, features, specs, availability, comparison, licensing model/tiers, how a product works, product overview
+- quotation     : requesting a price QUOTE or PROPOSAL document, asking for actual pricing numbers, ขอใบเสนอราคา, ขอราคา
+- subscription  : subscription renewal status, expiry date, ต่ออายุ, license KEY renewal (not licensing model questions)
+- technical     : technical support, spec compliance, TOR/SOW analysis, equipment recommendation, network/system design
 - general       : greetings, company info, complaints, general questions, anything else
+
+IMPORTANT: Questions about HOW a product is licensed (tiers, modules, per-user vs per-device) are "product_info", NOT "quotation".
+"quotation" is ONLY when someone explicitly asks for a price quote or proposal document.
 
 Reply with ONLY the category name. One word. No punctuation. No explanation."""
 
@@ -94,8 +97,10 @@ def route(intent: str, message: str, user_name: str, user_id: str,
     handler = agent_map.get(intent)
 
     if handler is None:
-        logger.info("Agent for '%s' not yet built — falling back to general", intent)
-        handler = general_handle
+        # quotation agent not yet built — route to product_agent so brand knowledge
+        # is available, rather than falling to general_handle which has no product list
+        logger.info("Agent for '%s' not yet built — falling back to product_agent", intent)
+        handler = product_handle
 
     return handler(
         message=message,
