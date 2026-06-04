@@ -32,6 +32,26 @@ line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 parser       = WebhookParser(LINE_CHANNEL_SECRET)
 init_db()
 
+# ── Email deduplication (in-memory, clears on restart) ───────────────────────
+# Prevents processing the same message_id more than once even if Graph
+# retries the notification or multiple subscriptions are active.
+import time as _time
+_processed_message_ids: dict = {}   # message_id → timestamp
+_DEDUP_TTL = 300                    # forget after 5 minutes
+
+
+def _is_duplicate(message_id: str) -> bool:
+    """Return True if this message_id was already processed recently."""
+    now = _time.time()
+    # Prune expired entries
+    expired = [k for k, t in _processed_message_ids.items() if now - t > _DEDUP_TTL]
+    for k in expired:
+        del _processed_message_ids[k]
+    if message_id in _processed_message_ids:
+        return True
+    _processed_message_ids[message_id] = now
+    return False
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -297,6 +317,12 @@ def email_webhook():
             logger.warning("Graph: no message_id in notification, skipping")
             continue
 
+        # Deduplicate — skip if already processed within the last 5 minutes
+        if _is_duplicate(message_id):
+            logger.info("Graph: duplicate notification for message_id=%s — skipping",
+                        message_id[:40])
+            continue
+
         logger.info("Graph: new email notification, message_id=%s", message_id[:40])
         _process_incoming_email(message_id)
 
@@ -371,30 +397,50 @@ def _process_incoming_email(message_id: str):
 
 @app.route("/setup-email", methods=["GET"])
 def setup_email():
-    """Create or renew the Microsoft Graph email webhook subscription."""
-    from email_handler import create_subscription, renew_subscription, list_subscriptions
+    """
+    Create or renew the Microsoft Graph email webhook subscription.
+    Also cleans up duplicate/stale subscriptions to prevent duplicate LINE alerts.
+    Visit: https://vrcomm-line.onrender.com/setup-email
+    """
+    from email_handler import create_subscription, renew_subscription, \
+                              list_subscriptions, delete_subscription
 
     try:
         existing_subs = list_subscriptions()
-        current = get_subscription()
+        current       = get_subscription()
+        deleted_ids   = []
 
+        # ── Delete ALL extra subscriptions (keep only the one we track) ───────
+        # Multiple active subscriptions cause duplicate LINE notifications.
+        keep_id = current["subscription_id"] if current else None
+        for s in existing_subs:
+            if s["id"] != keep_id:
+                try:
+                    delete_subscription(s["id"])
+                    deleted_ids.append(s["id"])
+                    logger.info("Deleted duplicate subscription: %s", s["id"])
+                except Exception as del_err:
+                    logger.warning("Could not delete subscription %s: %s", s["id"], del_err)
+
+        # ── Renew the tracked subscription if it still exists ─────────────────
         if current and any(s["id"] == current["subscription_id"] for s in existing_subs):
-            # Renew the existing one
             sub = renew_subscription(current["subscription_id"])
             save_subscription(sub["id"], sub["expirationDateTime"])
             return jsonify({
-                "action":    "renewed",
-                "id":        sub["id"],
-                "expiry":    sub["expirationDateTime"],
+                "action":       "renewed",
+                "id":           sub["id"],
+                "expiry":       sub["expirationDateTime"],
+                "deleted_dupes": deleted_ids,
             })
         else:
-            # Create a fresh subscription
+            # Create a fresh single subscription
             sub = create_subscription()
             save_subscription(sub["id"], sub["expirationDateTime"])
             return jsonify({
-                "action":    "created",
-                "id":        sub["id"],
-                "expiry":    sub["expirationDateTime"],
+                "action":       "created",
+                "id":           sub["id"],
+                "expiry":       sub["expirationDateTime"],
+                "deleted_dupes": deleted_ids,
             })
     except Exception as e:
         logger.error("setup-email error: %s", e)

@@ -128,6 +128,16 @@ def list_subscriptions() -> list:
     return resp.json().get("value", [])
 
 
+def delete_subscription(subscription_id: str) -> bool:
+    """Delete a Graph subscription by ID. Returns True on success."""
+    resp = requests.delete(
+        "%s/subscriptions/%s" % (GRAPH_BASE, subscription_id),
+        headers=_headers(),
+        timeout=15,
+    )
+    return resp.status_code == 204
+
+
 # ── Email fetch ───────────────────────────────────────────────────────────────
 
 def get_email(message_id: str) -> dict:
