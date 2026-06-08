@@ -72,6 +72,24 @@ def init_db():
                 updated_at      TEXT DEFAULT (datetime('now'))
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS quotations (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                quote_no      TEXT UNIQUE NOT NULL,
+                customer_name TEXT,
+                prepared_by   TEXT,
+                grand_total   REAL,
+                filepath      TEXT,
+                status        TEXT DEFAULT 'draft',
+                created_at    TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS processed_email_ids (
+                message_id   TEXT PRIMARY KEY,
+                processed_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
         conn.commit()
     logger.info("Database initialised at: %s", DB_PATH)
 
@@ -123,6 +141,25 @@ def get_all_pending() -> list:
 
 # ── Graph subscription tracking ───────────────────────────────────────────────
 
+def mark_email_processed(message_id: str) -> bool:
+    """
+    Atomically mark a Graph message_id as processed using SQLite's PRIMARY KEY constraint.
+    Returns True if this is the first time (should process).
+    Returns False if already seen (duplicate — skip).
+    Safe across multiple Gunicorn worker processes since they share the same DB file.
+    """
+    with get_conn() as conn:
+        try:
+            conn.execute(
+                "INSERT INTO processed_email_ids (message_id) VALUES (?)",
+                (message_id,)
+            )
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+
 def save_subscription(subscription_id: str, expiry: str):
     with get_conn() as conn:
         conn.execute("DELETE FROM graph_subscriptions")
@@ -137,6 +174,28 @@ def get_subscription() -> dict:
     with get_conn() as conn:
         row = conn.execute(
             "SELECT * FROM graph_subscriptions ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    return dict(row) if row else None
+
+
+# ── Quotation log ────────────────────────────────────────────────────────────
+
+def save_quotation(quote_no: str, customer_name: str, prepared_by: str,
+                   grand_total: float, filepath: str):
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT OR IGNORE INTO quotations
+               (quote_no, customer_name, prepared_by, grand_total, filepath)
+               VALUES (?, ?, ?, ?, ?)""",
+            (quote_no, customer_name, prepared_by, grand_total, filepath)
+        )
+        conn.commit()
+
+
+def get_quotation(quote_no: str) -> dict:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM quotations WHERE quote_no = ?", (quote_no,)
         ).fetchone()
     return dict(row) if row else None
 

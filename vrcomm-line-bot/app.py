@@ -1,5 +1,5 @@
 """VRCOMM LINE Bot Webhook Server"""
-import os, logging
+import os, logging, threading
 from datetime import datetime
 from flask import Flask, request, abort, jsonify, send_file, Response
 from linebot import LineBotApi, WebhookParser
@@ -13,7 +13,8 @@ from linebot.models import (
 from db import (init_db, log_message, get_all_messages,
                 get_history, save_turn, clear_history,
                 save_pending, get_pending, resolve_pending,
-                save_subscription, get_subscription)
+                save_subscription, get_subscription,
+                mark_email_processed)
 from ai_handler import process_with_ai
 from excel_export import export_to_excel
 from sheets_logger import log_to_sheet, save_history_turn, log_email, update_email_status
@@ -32,25 +33,8 @@ line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 parser       = WebhookParser(LINE_CHANNEL_SECRET)
 init_db()
 
-# ── Email deduplication (in-memory, clears on restart) ───────────────────────
-# Prevents processing the same message_id more than once even if Graph
-# retries the notification or multiple subscriptions are active.
-import time as _time
-_processed_message_ids: dict = {}   # message_id → timestamp
-_DEDUP_TTL = 300                    # forget after 5 minutes
-
-
-def _is_duplicate(message_id: str) -> bool:
-    """Return True if this message_id was already processed recently."""
-    now = _time.time()
-    # Prune expired entries
-    expired = [k for k, t in _processed_message_ids.items() if now - t > _DEDUP_TTL]
-    for k in expired:
-        del _processed_message_ids[k]
-    if message_id in _processed_message_ids:
-        return True
-    _processed_message_ids[message_id] = now
-    return False
+# Deduplication is handled by mark_email_processed() in db.py (SQLite PRIMARY KEY),
+# which is safe across multiple Gunicorn worker processes.
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -317,14 +301,22 @@ def email_webhook():
             logger.warning("Graph: no message_id in notification, skipping")
             continue
 
-        # Deduplicate — skip if already processed within the last 5 minutes
-        if _is_duplicate(message_id):
+        # Deduplicate via SQLite PRIMARY KEY — safe across multiple Gunicorn workers.
+        # mark_email_processed() returns False if this message_id was already inserted.
+        if not mark_email_processed(message_id):
             logger.info("Graph: duplicate notification for message_id=%s — skipping",
                         message_id[:40])
             continue
 
         logger.info("Graph: new email notification, message_id=%s", message_id[:40])
-        _process_incoming_email(message_id)
+        # Process in a background thread so we return 202 to Graph immediately.
+        # Graph has a short acknowledgement timeout (~5s); AI processing takes 10-30s,
+        # so without threading Graph retries the notification and causes duplicate alerts.
+        threading.Thread(
+            target=_process_incoming_email,
+            args=(message_id,),
+            daemon=True,
+        ).start()
 
     return "OK", 202
 
