@@ -322,25 +322,56 @@ def email_webhook():
 
 
 def _process_incoming_email(message_id: str):
-    """Fetch, AI-process, and notify admin via LINE for a new incoming email."""
+    """
+    Fetch and process an incoming email.
+
+    Decision tree:
+      ┌─ Has image attachment(s)?
+      │    └─ Vision extracts cost table?
+      │         ├─ YES → quotation pipeline (generate Excel + notify admin)
+      │         └─ NO  → normal email_processor flow
+      └─ No images → normal email_processor flow
+    """
     try:
-        from email_handler import get_email
+        from email_handler import get_email, get_email_attachments
         from email_processor import process_email, format_line_notification
 
-        email = get_email(message_id)
-        result = process_email(
+        email       = get_email(message_id)
+        attachments = get_email_attachments(message_id)
+
+        # ── Path A: image attachment → try cost-sheet vision extraction ────────
+        if attachments:
+            logger.info("Email has %d image attachment(s) — checking for cost table",
+                        len(attachments))
+            cost_result = _try_cost_sheet_extraction(
+                attachments=attachments,
+                email_body=email["body_text"],
+                email_subject=email["subject"],
+            )
+
+            if cost_result["is_cost_sheet"] and cost_result["items"]:
+                logger.info("Cost sheet detected (%d items) — routing to quotation pipeline",
+                            len(cost_result["items"]))
+                _process_cost_sheet_email(
+                    email=email,
+                    message_id=message_id,
+                    cost_items=cost_result["items"],
+                    customer_name=cost_result.get("customer_name"),
+                )
+                return  # done — skip normal email flow
+
+        # ── Path B: normal email processing ───────────────────────────────────
+        result   = process_email(
             sender_name=email["sender_name"],
             sender_email=email["sender_email"],
             subject=email["subject"],
             body_text=email["body_text"],
         )
+        task_id  = result["task_id"]
+        summary  = result["summary"]
+        draft    = result["draft_reply"]
+        category = result["category"]
 
-        task_id    = result["task_id"]
-        summary    = result["summary"]
-        draft      = result["draft_reply"]
-        category   = result["category"]
-
-        # Persist to SQLite for approval workflow
         save_pending(
             task_id=task_id,
             sender_name=email["sender_name"],
@@ -353,8 +384,6 @@ def _process_incoming_email(message_id: str):
             summary=summary,
             draft_reply=draft,
         )
-
-        # Log to Google Sheets "Email Messages" tab
         log_email(
             task_id=task_id,
             sender_name=email["sender_name"],
@@ -367,8 +396,6 @@ def _process_incoming_email(message_id: str):
             received_at=email.get("received_at", ""),
             status="pending",
         )
-
-        # Push LINE notification to admin for approval
         notification = format_line_notification(
             task_id=task_id,
             sender_name=email["sender_name"],
@@ -383,6 +410,107 @@ def _process_incoming_email(message_id: str):
 
     except Exception as e:
         logger.error("Error processing incoming email (msg_id=%s): %s", message_id, e)
+
+
+def _try_cost_sheet_extraction(attachments: list,
+                                email_body: str,
+                                email_subject: str) -> dict:
+    """Run image_cost_extractor on email attachments. Returns extractor result dict."""
+    try:
+        from image_cost_extractor import process_email_cost_sheet
+        return process_email_cost_sheet(
+            attachments=attachments,
+            email_body=email_body,
+            email_subject=email_subject,
+        )
+    except Exception as e:
+        logger.error("Cost sheet extraction error: %s", e)
+        return {"is_cost_sheet": False, "customer_name": None, "items": [], "image_count": 0}
+
+
+def _process_cost_sheet_email(email: dict, message_id: str,
+                               cost_items: list, customer_name: str):
+    """
+    Route a PM cost-sheet email directly to the Quotation Agent.
+
+    If customer_name is still unknown, the admin LINE notification will ask
+    them to confirm the customer before the quotation is finalised.
+    """
+    from agents.quotation_agent import handle as quotation_handle
+    from email_processor import generate_task_id
+
+    sender_name  = email["sender_name"]
+    sender_email = email["sender_email"]
+    subject      = email["subject"]
+
+    # Build a message that gives quotation_agent full context
+    items_summary = "\n".join(
+        "- %s %s x%d" % (it.get("brand", ""), it.get("product", ""), it.get("qty", 1))
+        for it in cost_items
+    )
+    message = (
+        "PM ส่ง Cost Sheet มาทางอีเมล\n"
+        "Subject: %s\n\n"
+        "สินค้าที่พบในรูป:\n%s"
+    ) % (subject, items_summary)
+
+    # Quotation agent will call product_agent.get_cost_sheet() automatically
+    # but cost items already have unit_cost_thb from the image → pass as cost_sheet_data
+    # (overrides the CostSheet lookup for items that already have a cost)
+    enriched_items = []
+    for it in cost_items:
+        if it.get("unit_cost_thb"):
+            enriched_items.append(it)   # cost known from image
+        else:
+            enriched_items.append(it)   # cost unknown → quotation_agent will look up
+
+    reply = quotation_handle(
+        message=message,
+        user_name=sender_name,
+        user_id=sender_email,
+        source="email",
+        history=[],
+        cost_sheet_data=enriched_items,
+        # Inject customer_name if known — passed through kwargs → data dict
+    )
+
+    # If customer unknown, prepend a warning to the admin notification
+    if not customer_name:
+        reply = (
+            "⚠️ ไม่พบชื่อลูกค้าในอีเมลหรือรูปภาพ — กรุณาระบุลูกค้าก่อนส่งให้ลูกค้า\n\n"
+            + reply
+        )
+
+    task_id = generate_task_id()
+    save_pending(
+        task_id=task_id,
+        sender_name=sender_name,
+        sender_email=sender_email,
+        subject=subject,
+        body_preview=("Cost Sheet image: %d items" % len(cost_items)),
+        full_body=message,
+        message_id=message_id,
+        category="quotation",
+        summary="Cost Sheet จาก PM — %d items%s" % (
+            len(cost_items),
+            (" | ลูกค้า: %s" % customer_name) if customer_name else " | ลูกค้า: ไม่ระบุ",
+        ),
+        draft_reply=reply,
+    )
+    log_email(
+        task_id=task_id,
+        sender_name=sender_name,
+        sender_email=sender_email,
+        subject=subject,
+        category="quotation",
+        body_preview=("Cost Sheet image: %d items" % len(cost_items)),
+        summary="Cost Sheet จาก PM",
+        draft_reply=reply,
+        received_at=email.get("received_at", ""),
+        status="pending",
+    )
+    push_to_admin(reply)
+    logger.info("Cost-sheet email processed: task=%s, items=%d", task_id, len(cost_items))
 
 
 # ── Email subscription setup ──────────────────────────────────────────────────
@@ -588,7 +716,6 @@ def debug_spec(brand: str):
         _SPECS_DIR,
     )
 
-    # ── Library availability check ────────────────────────────────────────────
     libs = {}
     for lib in ("pdfplumber", "pptx", "docx"):
         try:
@@ -597,7 +724,6 @@ def debug_spec(brand: str):
         except ImportError:
             libs[lib] = "NOT INSTALLED"
 
-    # ── Folder & file info ────────────────────────────────────────────────────
     folder      = _brand_folder_match(brand)
     local_files = []
     file_details = []
@@ -608,8 +734,6 @@ def debug_spec(brand: str):
             fpath = os.path.join(folder, fname)
             ext   = fname.lower().rsplit(".", 1)[-1] if "." in fname else ""
             info  = {"name": fname, "ext": ext, "size_bytes": os.path.getsize(fpath)}
-
-            # Try extracting rich files individually to check for errors
             if ext == "pptx":
                 try:
                     text = _extract_pptx_text(fpath, max_chars=200)
@@ -631,29 +755,22 @@ def debug_spec(brand: str):
                     info["extract_preview"] = text[:200]
                 except Exception as e:
                     info["extract_status"] = "ERROR: %s" % str(e)
-
             file_details.append(info)
 
-    # ── Content load ─────────────────────────────────────────────────────────
-    # Clear cache to force fresh load
     from agents.engineer_agent import _spec_cache
     _spec_cache.pop(brand.lower(), None)
-
     full_content = _load_spec_file(brand)
-    has_pptx_tag = "[PPTX:" in full_content
-    has_pdf_tag  = "[PDF:"  in full_content
-    has_docx_tag = "[DOCX:" in full_content
 
     return jsonify({
-        "brand":           brand,
-        "libraries":       libs,
-        "folder_found":    folder or "(not found)",
-        "file_details":    file_details,
-        "content_chars":   len(full_content),
-        "has_pptx_content": has_pptx_tag,
-        "has_pdf_content":  has_pdf_tag,
-        "has_docx_content": has_docx_tag,
-        "content_preview": full_content[:800] if full_content else "(empty)",
+        "brand":            brand,
+        "libraries":        libs,
+        "folder_found":     folder or "(not found)",
+        "file_details":     file_details,
+        "content_chars":    len(full_content),
+        "has_pptx_content": "[PPTX:" in full_content,
+        "has_pdf_content":  "[PDF:"  in full_content,
+        "has_docx_content": "[DOCX:" in full_content,
+        "content_preview":  full_content[:800] if full_content else "(empty)",
     })
 
 
