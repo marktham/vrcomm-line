@@ -83,24 +83,21 @@ def route(intent: str, message: str, user_name: str, user_id: str,
     from agents.product_agent       import handle as product_handle
     from agents.subscription_agent  import handle as subscription_handle
     from agents.engineer_agent      import handle as engineer_handle
+    from agents.quotation_agent     import handle as quotation_handle
 
-    # Map each intent to its handler.
-    # Set to None until that agent is built — will fall back to general.
     agent_map = {
         "general":      general_handle,
         "product_info": product_handle,
         "subscription": subscription_handle,
         "technical":    engineer_handle,
-        "quotation":    None,   # agents/quotation_agent.py — coming soon
+        "quotation":    quotation_handle,
     }
 
     handler = agent_map.get(intent)
 
     if handler is None:
-        # quotation agent not yet built — route to product_agent so brand knowledge
-        # is available, rather than falling to general_handle which has no product list
-        logger.info("Agent for '%s' not yet built — falling back to product_agent", intent)
-        handler = product_handle
+        logger.info("No agent for '%s' — falling back to general", intent)
+        handler = general_handle
 
     return handler(
         message=message,

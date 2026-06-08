@@ -665,6 +665,31 @@ def debug_spec(brand: str):
     })
 
 
+# ── Quotation download ────────────────────────────────────────────────────────
+
+@app.route("/download/quotation/<filename>", methods=["GET"])
+def download_quotation(filename: str):
+    """
+    Serve a generated quotation Excel file.
+    Only serves files matching QT-YYYYMMDD-NNN.xlsx pattern.
+    """
+    import re as _re
+    if not _re.match(r'^QT-\d{8}-\d{3}\.xlsx$', filename):
+        abort(400, description="Invalid quotation filename")
+
+    quotations_dir = os.path.join(os.path.dirname(__file__), "quotations")
+    filepath = os.path.join(quotations_dir, filename)
+    if not os.path.isfile(filepath):
+        abort(404, description="Quotation file not found")
+
+    return send_file(
+        filepath,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
 # ── Export & health ───────────────────────────────────────────────────────────
 
 @app.route("/export", methods=["GET"])
