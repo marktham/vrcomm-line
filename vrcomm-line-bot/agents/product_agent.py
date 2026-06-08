@@ -27,6 +27,166 @@ client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
 
 _BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PRODUCT_LIST = os.path.join(_BASE_DIR, "product", "VRCOMM_ProductList.xlsx")
+_COST_SHEET   = os.path.join(_BASE_DIR, "product", "VRCOMM_CostSheet.xlsx")
+
+# ── Cost sheet cache ──────────────────────────────────────────────────────────
+
+_cost_cache      = None          # list of {brand, product, unit_cost_thb, currency, notes}
+_cost_cache_time = 0.0
+_COST_CACHE_TTL  = 60            # short TTL so PM changes apply quickly
+
+
+def _load_cost_sheet() -> list:
+    """
+    Load VRCOMM_CostSheet.xlsx → list of {brand, product, unit_cost_thb, currency, notes}.
+    Cached for 60 seconds. Columns: Brand | Product/Model | Unit Cost (THB) | Currency | Notes
+    """
+    global _cost_cache, _cost_cache_time
+
+    path = _COST_SHEET
+    if not os.path.isfile(path):
+        logger.warning("[product_agent] CostSheet not found: %s", path)
+        return []
+
+    mtime = os.path.getmtime(path)
+    now   = time.time()
+    if (_cost_cache is not None
+            and mtime == _cost_cache_time
+            and (now - _cost_cache_time) < _COST_CACHE_TTL):
+        return _cost_cache
+
+    try:
+        import openpyxl
+        wb   = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        ws   = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            return []
+
+        # Skip header row
+        entries = []
+        for row in rows[1:]:
+            if not any(row):
+                continue
+            brand    = str(row[0]).strip() if row[0] else ""
+            product  = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+            cost_raw = row[2] if len(row) > 2 else None
+            currency = str(row[3]).strip() if len(row) > 3 and row[3] else "THB"
+            notes    = str(row[4]).strip() if len(row) > 4 and row[4] else ""
+
+            if not brand and not product:
+                continue
+            try:
+                cost = float(str(cost_raw).replace(",", "")) if cost_raw else None
+            except ValueError:
+                cost = None
+
+            entries.append({
+                "brand":         brand,
+                "product":       product,
+                "unit_cost_thb": cost,
+                "currency":      currency,
+                "notes":         notes,
+            })
+
+        _cost_cache      = entries
+        _cost_cache_time = mtime
+        logger.info("[product_agent] CostSheet loaded: %d entries", len(entries))
+        return entries
+    except Exception as e:
+        logger.error("[product_agent] CostSheet load error: %s", e)
+        return []
+
+
+def _fuzzy_match_cost(brand: str, product: str, cost_entries: list) -> dict | None:
+    """
+    Find best matching cost entry for a given brand + product.
+    Matching priority:
+      1. Exact brand + product (case-insensitive)
+      2. Brand exact + product partial (all query words in entry)
+      3. Brand partial + product partial
+    Returns matched entry dict or None.
+    """
+    b_query = brand.lower().strip()
+    p_query = product.lower().strip()
+    p_words = [w for w in p_query.split() if len(w) > 2]
+
+    best = None
+    best_score = 0
+
+    for entry in cost_entries:
+        eb = entry["brand"].lower().strip()
+        ep = entry["product"].lower().strip()
+
+        # Brand match score
+        if eb == b_query:
+            b_score = 3
+        elif b_query in eb or eb in b_query:
+            b_score = 2
+        elif any(w in eb for w in b_query.split() if len(w) > 2):
+            b_score = 1
+        else:
+            continue  # brand mismatch — skip
+
+        # Product match score
+        if ep == p_query:
+            p_score = 3
+        elif p_query in ep or ep in p_query:
+            p_score = 2
+        elif p_words and all(w in ep for w in p_words):
+            p_score = 2
+        elif p_words and any(w in ep for w in p_words):
+            p_score = 1
+        else:
+            p_score = 0
+
+        score = b_score * 10 + p_score
+        if score > best_score:
+            best_score = score
+            best = entry
+
+    # Require at least brand partial + product partial
+    return best if best_score >= 11 else None
+
+
+def get_cost_sheet(items: list) -> dict:
+    """
+    Public function called by quotation_agent.
+    For each item {brand, product, qty}, look up unit_cost_thb from CostSheet.
+
+    Returns:
+        {
+          "found":   [{brand, product, qty, unit_cost_thb, matched_product}, ...],
+          "missing": [{brand, product, qty}, ...],
+        }
+    """
+    cost_entries = _load_cost_sheet()
+    found   = []
+    missing = []
+
+    for item in items:
+        brand   = item.get("brand", "")
+        product = item.get("product", "")
+        qty     = int(item.get("qty") or 1)
+
+        match = _fuzzy_match_cost(brand, product, cost_entries)
+
+        if match and match.get("unit_cost_thb"):
+            found.append({
+                "brand":           brand,
+                "product":         product,
+                "qty":             qty,
+                "unit_cost_thb":   match["unit_cost_thb"],
+                "matched_product": match["product"],   # the exact name in cost sheet
+            })
+            logger.info("[product_agent] cost hit: %s %s → %.0f THB",
+                        brand, product, match["unit_cost_thb"])
+        else:
+            missing.append({"brand": brand, "product": product, "qty": qty})
+            logger.warning("[product_agent] cost miss: %s %s", brand, product)
+
+    return {"found": found, "missing": missing}
+
 
 # ── Product list cache ────────────────────────────────────────────────────────
 
