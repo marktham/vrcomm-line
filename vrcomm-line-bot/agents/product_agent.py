@@ -345,6 +345,56 @@ def _fetch_url(url: str) -> str:
         return ""
 
 
+# ── Deep-search detector ─────────────────────────────────────────────────────
+
+_DEEP_SEARCH_KEYWORDS = [
+    "search internet", "search the internet", "look up online", "search online",
+    "more info online", "internet search", "web search", "search web",
+    "more information online", "find online", "look online", "search for more",
+    "find more info", "more details online", "search more", "more on internet",
+    "ค้นหาอินเทอร์เน็ต", "ค้นอินเทอร์เน็ต", "ค้นหาออนไลน์", "หาข้อมูลเพิ่ม",
+    "หาข้อมูลอินเตอร์เน็ต", "ค้นหาเพิ่ม", "ค้นออนไลน์", "หาเพิ่มเติม",
+    "ค้นเพิ่ม", "หาข้อมูลเพิ่มเติม",
+]
+
+
+def _detect_deep_search(message: str) -> bool:
+    """Return True if the user is explicitly asking to search for more info online."""
+    msg_lower = message.lower()
+    return any(kw in msg_lower for kw in _DEEP_SEARCH_KEYWORDS)
+
+
+def _fetch_product_pages(brand_url: str, max_chars: int = 2500) -> str:
+    """
+    Fetch additional product/solution pages from vendor domain.
+    Tries common sub-paths for deeper product info.
+    """
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(brand_url.strip())
+        base_url = "%s://%s" % (parsed.scheme, parsed.netloc)
+    except Exception:
+        return ""
+
+    extra_paths = [
+        "/products", "/solutions", "/platform", "/features",
+        "/product", "/solution", "/services", "/technology",
+    ]
+
+    collected = ""
+    for path in extra_paths:
+        url = base_url + path
+        if url == brand_url.rstrip("/"):
+            continue  # already fetched
+        content = _fetch_url(url)
+        if content and len(content) > 100:
+            collected += "\n\n[%s]:\n%s" % (url, content[:600])
+            if len(collected) >= max_chars:
+                break
+
+    return collected[:max_chars]
+
+
 # ── Compare-mode detector ─────────────────────────────────────────────────────
 
 _COMPARE_KEYWORDS = [
@@ -422,9 +472,17 @@ This is an INTERNAL conversation — staff to staff, NOT customer-facing.
 ALLOWED BRANDS — you may ONLY discuss these, nothing else:
 {allowed_brand_names}
 
-Product details:
+Product details (fetched live from vendor websites):
 {selected_brands_section}
 ══════════════════════════════════════════════════════
+
+INTERNET ACCESS NOTE:
+The "Product details" section above was fetched LIVE from each vendor's official website right now.
+You DO have access to real-time internet-sourced product information for VRCOMM's portfolio.
+NEVER say "I cannot search the internet", "I don't have internet access", or "I'm unable to browse the web".
+If someone asks you to "search more on the internet" or "find more info online", acknowledge that you
+have already fetched the vendor website content above, share what you found, and offer to look for
+more specific details if needed.
 
 BEFORE you write anything, ask yourself: "Is every brand I am about to mention in the ALLOWED BRANDS list above?"
 If no → remove it from your answer.
@@ -449,9 +507,14 @@ Your role is to give an honest but VRCOMM-favourable comparison.
 VRCOMM PRODUCTS (what we sell — always the recommended choice):
 {allowed_brand_names}
 
-Product details:
+Product details (fetched live from vendor websites):
 {selected_brands_section}
 ══════════════════════════════════════════════════════
+
+INTERNET ACCESS NOTE:
+The "Product details" section above was fetched LIVE from each vendor's official website right now.
+You DO have access to real-time internet-sourced product information.
+NEVER say "I cannot search the internet" or "I'm unable to browse the web".
 
 COMPARISON RULES:
 - You MAY name competitor products (e.g. Fortinet, Cisco, Palo Alto) ONLY to compare them — do NOT recommend, offer, or suggest them as a solution.
@@ -489,7 +552,8 @@ RULES:
 
 
 def _build_answer_system(selected: list, product_list: list,
-                         compare_mode: bool = False) -> str:
+                         compare_mode: bool = False,
+                         deep_search: bool = False) -> str:
     if selected:
         # Build explicit allowed-brand list (positive constraint)
         allowed_brand_names = "\n".join(
@@ -502,7 +566,14 @@ def _build_answer_system(selected: list, product_list: list,
             content = _fetch_url(p["url"])
             section = "Brand: %s\nWebsite: %s" % (p["brand"], p["url"])
             if content:
-                section += "\nProduct info:\n%s" % content[:1500]
+                section += "\nHomepage content:\n%s" % content[:1500]
+                # Deep search: fetch additional product/solution pages
+                if deep_search:
+                    extra = _fetch_product_pages(p["url"])
+                    if extra:
+                        section += "\n\nAdditional pages fetched:%s" % extra
+            else:
+                section += "\n(Website could not be fetched — use spec files or known info)"
             sections.append(section)
         selected_brands_section = "\n\n---\n".join(sections)
 
@@ -543,13 +614,18 @@ def handle(message: str, user_name: str, user_id: str,
 
     # Detect compare mode — comparison queries may name competitor brands
     compare_mode = _detect_compare_mode(message)
-    logger.info("[product_agent] compare_mode=%s for: %s", compare_mode, message[:60])
+    # Detect if user explicitly wants deeper internet search
+    deep_search = _detect_deep_search(message)
+    logger.info("[product_agent] compare_mode=%s deep_search=%s for: %s",
+                compare_mode, deep_search, message[:60])
 
     # STEP 1 — select relevant brands from our list
     selected = _select_relevant_brands(message, product_list)
 
     # STEP 2 — answer using only selected brands (or suggest alternatives)
-    system = _build_answer_system(selected, product_list, compare_mode=compare_mode)
+    system = _build_answer_system(selected, product_list,
+                                  compare_mode=compare_mode,
+                                  deep_search=deep_search)
 
     # Internal framing — staff, not customer
     src_note = " (via email)" if source == "email" else ""
@@ -598,8 +674,8 @@ def handle(message: str, user_name: str, user_id: str,
                     logger.warning("[product_agent] Retry still has forbidden brand — stripping")
                     reply = _strip_forbidden_sentences(reply)
 
-        logger.info("[product_agent] replied to %s (selected=%s, compare=%s): %s",
-                    user_name, [s["brand"] for s in selected], compare_mode, reply[:80])
+        logger.info("[product_agent] replied to %s (selected=%s, compare=%s, deep=%s): %s",
+                    user_name, [s["brand"] for s in selected], compare_mode, deep_search, reply[:80])
         return reply
 
     except Exception as e:
